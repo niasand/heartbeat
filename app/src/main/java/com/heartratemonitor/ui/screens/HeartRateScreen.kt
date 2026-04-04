@@ -50,6 +50,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import dagger.hilt.android.EntryPointAccessors
 import com.heartratemonitor.di.PreferencesEntryPoint
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Close
 
 /**
  * 主屏幕 - 心率监测
@@ -558,16 +560,39 @@ fun CountdownTimerCard() {
                 }
             }
 
-            // 铃声选择
-            TextButton(onClick = {
-                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "选择倒计时铃声")
-                    timerSoundUri?.let { putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(it)) }
+            // 铃声选择 + 试听
+            var previewRingtone by remember { mutableStateOf<Ringtone?>(null) }
+            LaunchedEffect(timerSoundUri) {
+                previewRingtone?.stop()
+                val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
+                    else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                previewRingtone = try { RingtoneManager.getRingtone(context, uri) } catch (_: Exception) { null }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(onClick = {
+                    previewRingtone?.let {
+                        if (it.isPlaying) it.stop() else it.play()
+                    }
+                }) {
+                    Icon(
+                        imageVector = if (previewRingtone?.isPlaying == true) Icons.Default.Close else Icons.Default.PlayArrow,
+                        contentDescription = if (previewRingtone?.isPlaying == true) "停止试听" else "试听",
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
-                ringtonePickerLauncher.launch(intent)
-            }) {
-                Text("铃声: $soundName", fontSize = 12.sp)
+                TextButton(onClick = {
+                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "选择倒计时铃声")
+                        timerSoundUri?.let { putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(it)) }
+                    }
+                    ringtonePickerLauncher.launch(intent)
+                }) {
+                    Text("铃声: $soundName", fontSize = 12.sp)
+                }
             }
         }
     }
