@@ -2,6 +2,7 @@ package com.heartratemonitor.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -309,22 +310,22 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             fontWeight = FontWeight.Bold
                         )
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(0.dp),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            FilterChip(
-                                selected = !showDailyStats,
-                                onClick = { showDailyStats = false },
-                                label = { Text("BySec", fontSize = 12.sp) },
-                                shape = RoundedCornerShape(8.dp)
+                            Text(
+                                text = "BySec",
+                                fontSize = 13.sp,
+                                fontWeight = if (!showDailyStats) FontWeight.Bold else FontWeight.Normal,
+                                color = if (!showDailyStats) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.clickable { showDailyStats = false }
                             )
-                            FilterChip(
-                                selected = showDailyStats,
-                                onClick = { showDailyStats = true },
-                                label = { Text("ByDay", fontSize = 12.sp) },
-                                shape = RoundedCornerShape(8.dp)
+                            Text(
+                                text = "ByDay",
+                                fontSize = 13.sp,
+                                fontWeight = if (showDailyStats) FontWeight.Bold else FontWeight.Normal,
+                                color = if (showDailyStats) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.clickable { showDailyStats = true }
                             )
                         }
                     }
