@@ -323,7 +323,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             FilterChip(
                                 selected = showDailyStats,
                                 onClick = { showDailyStats = true },
-                                label = { Text("每日", fontSize = 12.sp) },
+                                label = { Text("ByDay", fontSize = 12.sp) },
                                 shape = RoundedCornerShape(8.dp)
                             )
                         }
