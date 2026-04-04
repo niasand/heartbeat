@@ -126,7 +126,7 @@ private fun TimerBarChart(
 
     Column(modifier = modifier) {
         Text(
-            text = "计时统计",
+            text = "计时次数",
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 12.dp)
