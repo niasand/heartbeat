@@ -157,7 +157,7 @@ private fun TimerBarChart(
                     // Bar
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .width(28.dp)
                             .height(barHeight.dp.coerceAtLeast(4.dp))
                     ) {
                         Surface(
