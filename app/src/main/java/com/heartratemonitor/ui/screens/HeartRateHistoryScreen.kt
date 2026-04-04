@@ -515,9 +515,9 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
     val maxBpm = dailyStats.maxOf { it.maxHeartRate }.coerceAtLeast(1)
     val chartHeight = 180.dp
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-    val highColor = Color(0xFFE53935) // 红
-    val avgColor = Color(0xFF1E88E5) // 蓝
-    val lowColor = Color(0xFF43A047) // 绿
+    val highColor = AppColors.HeartRateHigh  // 橙
+    val avgColor = AppColors.Primary          // 紫
+    val lowColor = AppColors.HeartRateNormal   // 绿
 
     Column(modifier = Modifier.fillMaxSize()) {
         // 柱状图 + 坐标轴
