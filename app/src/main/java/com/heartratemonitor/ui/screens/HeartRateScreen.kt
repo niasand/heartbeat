@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import android.widget.Toast
 import com.heartratemonitor.R
 import com.heartratemonitor.ui.theme.AppColors
@@ -530,6 +532,7 @@ fun CountdownTimerCard() {
                     modifier = Modifier.width(64.dp),
                     singleLine = true,
                     enabled = !isRunning,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                 )
                 Text("分", fontSize = 14.sp)
@@ -549,6 +552,7 @@ fun CountdownTimerCard() {
                     modifier = Modifier.width(64.dp),
                     singleLine = true,
                     enabled = !isRunning,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                 )
                 Text("秒", fontSize = 14.sp)
