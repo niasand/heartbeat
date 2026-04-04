@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.heartratemonitor.data.entity.HeartRateEntity
 import com.heartratemonitor.data.pref.PreferencesManager
 import com.heartratemonitor.data.repository.HeartRateRepository
+import com.heartratemonitor.data.repository.TimerSessionRepository
+import com.heartratemonitor.data.entity.TimerSessionEntity
+import com.heartratemonitor.data.dao.DateCountPair
 import com.heartratemonitor.ble.BleConnectionManager
 import com.heartratemonitor.ble.BleScanner
 import com.heartratemonitor.ble.DeviceInfo
@@ -34,6 +37,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 @HiltViewModel
 class HeartRateViewModel @Inject constructor(
     private val heartRateRepository: HeartRateRepository,
+    private val timerSessionRepository: TimerSessionRepository,
     private val preferencesManager: PreferencesManager,
     private val bleScanner: BleScanner,
     private val bleConnectionManager: BleConnectionManager,
@@ -89,6 +93,18 @@ class HeartRateViewModel @Inject constructor(
         viewModelScope,
         SharingStarted.Eagerly,
         null
+    )
+
+    val timerSessionHistory: StateFlow<List<TimerSessionEntity>> = timerSessionRepository.getAllSessions().stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        emptyList()
+    )
+
+    val timerCountByDate: StateFlow<List<DateCountPair>> = timerSessionRepository.getCountByDate().stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        emptyList()
     )
 
     sealed class ServiceState {
@@ -233,6 +249,15 @@ class HeartRateViewModel @Inject constructor(
     fun saveLowThreshold(value: Int) {
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             preferencesManager.saveLowThreshold(value)
+        }
+    }
+
+    /**
+     * Save timer session when countdown finishes
+     */
+    fun saveTimerSession(durationSeconds: Int) {
+        viewModelScope.launch {
+            timerSessionRepository.saveSession(durationSeconds)
         }
     }
 

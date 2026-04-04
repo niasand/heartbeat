@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.ui.focus.FocusState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import android.widget.Toast
@@ -54,6 +56,7 @@ import dagger.hilt.android.EntryPointAccessors
 import com.heartratemonitor.di.PreferencesEntryPoint
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Notifications
 
 /**
  * 主屏幕 - 心率监测
@@ -107,6 +110,12 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 }
                 )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
+                    label = { Text("计时") },
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 }
+                )
             }
         }
     ) { padding ->
@@ -127,6 +136,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
                     { hasAutoConnectedDevice = it }
                 )
                 1 -> HeartRateHistoryScreen(viewModel)
+                2 -> TimerHistoryScreen(viewModel)
             }
         }
     }
@@ -362,7 +372,7 @@ fun RealTimeHeartRateScreen(
         }
 
         // 倒计时
-        CountdownTimerCard()
+        CountdownTimerCard(viewModel)
     }
 
     // 设备选择对话框
@@ -405,7 +415,7 @@ fun RealTimeHeartRateScreen(
  * 支持设置分钟和秒、开始/暂停，倒计时结束播放铃声
  */
 @Composable
-fun CountdownTimerCard() {
+fun CountdownTimerCard(viewModel: HeartRateViewModel) {
     var totalSeconds by remember { mutableIntStateOf(40) }
     var remainingSeconds by remember { mutableIntStateOf(40) }
     var isRunning by remember { mutableStateOf(false) }
@@ -445,6 +455,7 @@ fun CountdownTimerCard() {
         if (remainingSeconds == 0 && !isRunning && !hasPlayed) {
             hasPlayed = true
             Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
+            viewModel.saveTimerSession(totalSeconds)
             try {
                 mediaPlayer.reset()
                 val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
@@ -521,7 +532,11 @@ fun CountdownTimerCard() {
                             }
                         }
                     },
-                    modifier = Modifier.width(64.dp),
+                    modifier = Modifier
+                        .width(64.dp)
+                        .onFocusEvent { state ->
+                            if (state.isFocused) inputMinutes = ""
+                        },
                     singleLine = true,
                     enabled = !isRunning,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -541,7 +556,11 @@ fun CountdownTimerCard() {
                             }
                         }
                     },
-                    modifier = Modifier.width(64.dp),
+                    modifier = Modifier
+                        .width(64.dp)
+                        .onFocusEvent { state ->
+                            if (state.isFocused) inputSeconds = ""
+                        },
                     singleLine = true,
                     enabled = !isRunning,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

@@ -6,20 +6,23 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.heartratemonitor.data.dao.HeartRateDao
+import com.heartratemonitor.data.dao.TimerSessionDao
 import com.heartratemonitor.data.entity.HeartRateEntity
+import com.heartratemonitor.data.entity.TimerSessionEntity
 
 /**
  * 心率数据库
  */
 @Database(
-    entities = [HeartRateEntity::class],
-    version = 1,
+    entities = [HeartRateEntity::class, TimerSessionEntity::class],
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class HeartRateDatabase : RoomDatabase() {
 
     abstract fun heartRateDao(): HeartRateDao
+    abstract fun timerSessionDao(): TimerSessionDao
 
     companion object {
         @Volatile

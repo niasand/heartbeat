@@ -2,8 +2,10 @@ package com.heartratemonitor.di
 
 import android.content.Context
 import com.heartratemonitor.data.dao.HeartRateDao
+import com.heartratemonitor.data.dao.TimerSessionDao
 import com.heartratemonitor.data.database.HeartRateDatabase
 import com.heartratemonitor.data.repository.HeartRateRepository
+import com.heartratemonitor.data.repository.TimerSessionRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,5 +33,17 @@ object DatabaseModule {
     @Singleton
     fun provideHeartRateRepository(heartRateDao: HeartRateDao): HeartRateRepository {
         return HeartRateRepository(heartRateDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTimerSessionDao(database: HeartRateDatabase): TimerSessionDao {
+        return database.timerSessionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTimerSessionRepository(timerSessionDao: TimerSessionDao): TimerSessionRepository {
+        return TimerSessionRepository(timerSessionDao)
     }
 }
