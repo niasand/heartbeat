@@ -392,11 +392,11 @@ fun RealTimeHeartRateScreen(
  */
 @Composable
 fun CountdownTimerCard() {
-    var totalSeconds by remember { mutableIntStateOf(60) }
-    var remainingSeconds by remember { mutableIntStateOf(60) }
+    var totalSeconds by remember { mutableIntStateOf(40) }
+    var remainingSeconds by remember { mutableIntStateOf(40) }
     var isRunning by remember { mutableStateOf(false) }
-    var inputMinutes by remember { mutableStateOf("1") }
-    var inputSeconds by remember { mutableStateOf("0") }
+    var inputMinutes by remember { mutableStateOf("0") }
+    var inputSeconds by remember { mutableStateOf("40") }
 
     // 倒计时逻辑
     LaunchedEffect(isRunning, remainingSeconds) {
@@ -448,71 +448,54 @@ fun CountdownTimerCard() {
                     else MaterialTheme.colorScheme.onSecondaryContainer
             )
 
-            // 设置分钟和秒（仅停止且未开始时可编辑）
-            if (!isRunning && remainingSeconds == totalSeconds) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("分", fontSize = 14.sp)
-                    OutlinedTextField(
-                        value = inputMinutes,
-                        onValueChange = { text ->
-                            if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..999 } == true)) {
-                                inputMinutes = text
-                            }
-                        },
-                        modifier = Modifier.width(64.dp),
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
-                    )
-                    Text("秒", fontSize = 14.sp)
-                    OutlinedTextField(
-                        value = inputSeconds,
-                        onValueChange = { text ->
-                            if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..59 } == true)) {
-                                inputSeconds = text
-                            }
-                        },
-                        modifier = Modifier.width(64.dp),
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
-                    )
-                    Button(
-                        onClick = {
-                            val mins = inputMinutes.toIntOrNull() ?: 0
-                            val secs = inputSeconds.toIntOrNull() ?: 0
-                            val total = mins * 60 + secs
-                            if (total > 0) {
-                                totalSeconds = total
-                                remainingSeconds = total
+            // 输入框在左，标签在右，开始按钮最后
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedTextField(
+                    value = inputMinutes,
+                    onValueChange = { text ->
+                        if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..999 } == true)) {
+                            inputMinutes = text
+                            if (!isRunning) {
+                                val mins = text.toIntOrNull() ?: 0
+                                val secs = inputSeconds.toIntOrNull() ?: 0
+                                val total = mins * 60 + secs
+                                if (total > 0) { totalSeconds = total; remainingSeconds = total }
                             }
                         }
-                    ) {
-                        Text("确认")
-                    }
-                }
-            }
-
-            // 控制按钮
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+                    },
+                    modifier = Modifier.width(64.dp),
+                    singleLine = true,
+                    enabled = !isRunning,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
+                )
+                Text("分", fontSize = 14.sp)
+                OutlinedTextField(
+                    value = inputSeconds,
+                    onValueChange = { text ->
+                        if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..59 } == true)) {
+                            inputSeconds = text
+                            if (!isRunning) {
+                                val mins = inputMinutes.toIntOrNull() ?: 0
+                                val secs = text.toIntOrNull() ?: 0
+                                val total = mins * 60 + secs
+                                if (total > 0) { totalSeconds = total; remainingSeconds = total }
+                            }
+                        }
+                    },
+                    modifier = Modifier.width(64.dp),
+                    singleLine = true,
+                    enabled = !isRunning,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
+                )
+                Text("秒", fontSize = 14.sp)
                 Button(
                     onClick = { isRunning = !isRunning },
                     enabled = remainingSeconds > 0
                 ) {
                     Text(if (isRunning) "暂停" else "开始")
-                }
-                OutlinedButton(onClick = {
-                    isRunning = false
-                    val mins = inputMinutes.toIntOrNull() ?: 0
-                    val secs = inputSeconds.toIntOrNull() ?: 0
-                    val total = mins * 60 + secs
-                    totalSeconds = if (total > 0) total else 60
-                    remainingSeconds = totalSeconds
-                }) {
-                    Text("重置")
                 }
             }
         }
