@@ -514,6 +514,8 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
     }
 
     val maxBpm = dailyStats.maxOf { it.maxHeartRate }.coerceAtLeast(1)
+    // Y轴刻度：向上取整到10的倍数
+    val yAxisMax = ((maxBpm + 9) / 10 * 10).coerceAtLeast(100)
     val chartHeight = 180.dp
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
     val highColor = AppColors.HeartRateHigh  // 橙
@@ -527,7 +529,7 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            // 画坐标轴
+            // 画坐标轴 + Y轴刻度
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val strokeWidth = 1.dp.toPx()
                 // Y 轴
@@ -548,18 +550,32 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
                 )
             }
 
+            // Y轴刻度标签（绝对定位在左侧）
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(end = 4.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("${yAxisMax}", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${yAxisMax * 3 / 4}", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${yAxisMax / 2}", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${yAxisMax / 4}", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("0", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
             // 柱状图内容
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 4.dp),
+                    .padding(start = 28.dp, end = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
                 dailyStats.forEach { day ->
-                    val highH = (day.maxHeartRate.toFloat() / maxBpm) * (chartHeight.value - 20)
-                    val avgH = (day.avgHeartRate.toFloat() / maxBpm) * (chartHeight.value - 20)
-                    val lowH = (day.minHeartRate.toFloat() / maxBpm) * (chartHeight.value - 20)
+                    val highH = (day.maxHeartRate.toFloat() / yAxisMax) * (chartHeight.value - 20)
+                    val avgH = (day.avgHeartRate.toFloat() / yAxisMax) * (chartHeight.value - 20)
+                    val lowH = (day.minHeartRate.toFloat() / yAxisMax) * (chartHeight.value - 20)
 
                     Column(
                         modifier = Modifier.weight(1f),
@@ -567,6 +583,8 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
                         verticalArrangement = Arrangement.Bottom
                     ) {
                         // 最高
+                        Text("${day.maxHeartRate}", fontSize = 7.sp, color = highColor, maxLines = 1)
+                        Spacer(modifier = Modifier.height(1.dp))
                         Box(
                             modifier = Modifier
                                 .width(12.dp)
@@ -575,6 +593,8 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         // 平均
+                        Text("${day.avgHeartRate.toInt()}", fontSize = 7.sp, color = avgColor, maxLines = 1)
+                        Spacer(modifier = Modifier.height(1.dp))
                         Box(
                             modifier = Modifier
                                 .width(12.dp)
@@ -583,6 +603,8 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         // 最低
+                        Text("${day.minHeartRate}", fontSize = 7.sp, color = lowColor, maxLines = 1)
+                        Spacer(modifier = Modifier.height(1.dp))
                         Box(
                             modifier = Modifier
                                 .width(12.dp)
@@ -600,7 +622,7 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 4.dp),
+                .padding(start = 28.dp, end = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             dailyStats.forEach { day ->
@@ -615,7 +637,7 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
             }
         }
 
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         // 图例
         Row(
@@ -624,7 +646,9 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             LegendDot(color = highColor, label = "最高")
+            Spacer(modifier = Modifier.width(16.dp))
             LegendDot(color = avgColor, label = "平均")
+            Spacer(modifier = Modifier.width(16.dp))
             LegendDot(color = lowColor, label = "最低")
         }
     }
