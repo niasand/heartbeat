@@ -334,7 +334,7 @@ class HeartRateViewModel @Inject constructor(
      * 格式化日期为中文格式
      */
     fun formatDate(timestamp: Long): String {
-        val sdf = SimpleDateFormat("yyyy年MM月dd日 HH:mm", Locale.CHINA)
+        val sdf = SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss", Locale.CHINA)
         return sdf.format(Date(timestamp))
     }
 
