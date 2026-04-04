@@ -582,35 +582,42 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Bottom
                     ) {
-                        // 最高
-                        Text("${day.maxHeartRate}", fontSize = 7.sp, color = highColor, maxLines = 1)
-                        Spacer(modifier = Modifier.height(1.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(12.dp)
-                                .height(highH.dp.coerceAtLeast(2.dp))
-                                .background(highColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        // 平均
-                        Text("${day.avgHeartRate.toInt()}", fontSize = 7.sp, color = avgColor, maxLines = 1)
-                        Spacer(modifier = Modifier.height(1.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(12.dp)
-                                .height(avgH.dp.coerceAtLeast(2.dp))
-                                .background(avgColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        // 最低
-                        Text("${day.minHeartRate}", fontSize = 7.sp, color = lowColor, maxLines = 1)
-                        Spacer(modifier = Modifier.height(1.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(12.dp)
-                                .height(lowH.dp.coerceAtLeast(2.dp))
-                                .background(lowColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                        )
+                        // 3根柱子并排
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(1.dp)
+                        ) {
+                            // 最低
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("${day.minHeartRate}", fontSize = 7.sp, color = lowColor, maxLines = 1)
+                                Box(
+                                    modifier = Modifier
+                                        .width(10.dp)
+                                        .height(lowH.dp.coerceAtLeast(2.dp))
+                                        .background(lowColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                                )
+                            }
+                            // 平均
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("${day.avgHeartRate.toInt()}", fontSize = 7.sp, color = avgColor, maxLines = 1)
+                                Box(
+                                    modifier = Modifier
+                                        .width(10.dp)
+                                        .height(avgH.dp.coerceAtLeast(2.dp))
+                                        .background(avgColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                                )
+                            }
+                            // 最高
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("${day.maxHeartRate}", fontSize = 7.sp, color = highColor, maxLines = 1)
+                                Box(
+                                    modifier = Modifier
+                                        .width(10.dp)
+                                        .height(highH.dp.coerceAtLeast(2.dp))
+                                        .background(highColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                                )
+                            }
+                        }
                     }
                 }
             }
