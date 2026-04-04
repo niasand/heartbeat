@@ -255,7 +255,7 @@ fun RealTimeHeartRateScreen(
     ) {
         // 心率显示卡片（紧凑版）
         Card(
-            modifier = Modifier.size(120.dp),
+            modifier = Modifier.size(180.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -269,7 +269,7 @@ fun RealTimeHeartRateScreen(
                 // 状态指示器
                 Box(
                     modifier = Modifier
-                        .size(6.dp)
+                        .size(10.dp)
                         .clip(CircleShape)
                         .background(
                             when (connectionState) {
@@ -282,12 +282,12 @@ fun RealTimeHeartRateScreen(
                         )
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // 心率数值
                 Text(
                     text = (currentHeartRate ?: "--").toString(),
-                    fontSize = 40.sp,
+                    fontSize = 56.sp,
                     fontWeight = FontWeight.Bold,
                     color = when {
                         currentHeartRate == null -> Color.Gray
@@ -300,12 +300,12 @@ fun RealTimeHeartRateScreen(
                 // BPM标签
                 Text(
                     text = stringResource(R.string.bpm),
-                    fontSize = 8.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // 连接状态
                 Text(
@@ -320,7 +320,7 @@ fun RealTimeHeartRateScreen(
                         }
                         else -> stringResource(R.string.disconnected)
                     },
-                    fontSize = 8.sp,
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
             }
