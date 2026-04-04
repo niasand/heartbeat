@@ -2,6 +2,7 @@ package com.heartratemonitor.data.repository
 
 import com.heartratemonitor.data.dao.HeartRateDao
 import com.heartratemonitor.data.dao.HeartRateStats
+import com.heartratemonitor.data.dao.DailyHeartRateStats
 import com.heartratemonitor.data.entity.HeartRateEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -72,5 +73,12 @@ class HeartRateRepository @Inject constructor(
      */
     suspend fun deleteAll() {
         heartRateDao.deleteAll()
+    }
+
+    /**
+     * 获取过去N天的每日统计
+     */
+    suspend fun getDailyStats(sinceTimestamp: Long): List<DailyHeartRateStats> {
+        return heartRateDao.getDailyStats(sinceTimestamp)
     }
 }

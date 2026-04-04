@@ -80,6 +80,23 @@ interface HeartRateDao {
      */
     @Query("SELECT * FROM heart_rates WHERE timestamp > :afterTimestamp ORDER BY timestamp ASC")
     suspend fun getAfter(afterTimestamp: Long): List<HeartRateEntity>
+
+    /**
+     * 按日期聚合心率统计（过去N天）
+     */
+    @Query("""
+        SELECT DATE(timestamp / 1000, 'unixepoch', 'localtime') as date,
+               AVG(heart_rate) as avgHeartRate,
+               MAX(heart_rate) as maxHeartRate,
+               MIN(heart_rate) as minHeartRate,
+               COUNT(*) as count
+        FROM heart_rates
+        WHERE timestamp >= :sinceTimestamp
+        GROUP BY date
+        ORDER BY date ASC
+        LIMIT 7
+    """)
+    suspend fun getDailyStats(sinceTimestamp: Long): List<DailyHeartRateStats>
 }
 
 /**
@@ -89,5 +106,13 @@ data class HeartRateStats(
     val avgHeartRate: Double?,
     val maxHeartRate: Int?,
     val minHeartRate: Int?,
+    val count: Int
+)
+
+data class DailyHeartRateStats(
+    val date: String,
+    val avgHeartRate: Double,
+    val maxHeartRate: Int,
+    val minHeartRate: Int,
     val count: Int
 )

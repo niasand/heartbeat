@@ -1,6 +1,7 @@
 package com.heartratemonitor.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,7 +10,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +23,7 @@ import com.heartratemonitor.ui.theme.AppColors
 import com.heartratemonitor.viewmodel.HeartRateViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heartratemonitor.data.entity.HeartRateEntity
+import com.heartratemonitor.data.dao.DailyHeartRateStats
 
 import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
 import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
@@ -145,13 +150,16 @@ fun rememberMarker(): Marker {
 fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     // 1. 获取所有数据（用于图表）
     val allHeartRateHistory by viewModel.heartRateHistory.collectAsState()
-    
+
     // 2. 获取最近600条数据（用于列表）
     val recentHeartRateHistory = remember(allHeartRateHistory) {
         allHeartRateHistory.take(600)
     }
-    
+
     val heartRateStats by viewModel.heartRateStats.collectAsState()
+    val dailyStats by viewModel.dailyStats.collectAsState()
+
+    var showDailyStats by remember { mutableStateOf(false) }
 
     // 准备图表数据 (显示过去180分钟的心率数据)
     val chartData: Any = remember(allHeartRateHistory) {
@@ -274,7 +282,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
 
         // 折线图卡片
-        if (entries.isNotEmpty()) {
+        if (entries.isNotEmpty() || dailyStats.isNotEmpty()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -289,63 +297,101 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                         .fillMaxSize()
                         .padding(16.dp)
                 ) {
-                    Text(
-                        text = chartTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    if (timeRangeText.isNotEmpty()) {
+                    // 标题 + 切换按钮
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = timeRangeText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            text = if (showDailyStats) "过去7天心率统计" else chartTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(0.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            FilterChip(
+                                selected = !showDailyStats,
+                                onClick = { showDailyStats = false },
+                                label = { Text("趋势", fontSize = 12.sp) },
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            FilterChip(
+                                selected = showDailyStats,
+                                onClick = { showDailyStats = true },
+                                label = { Text("每日", fontSize = 12.sp) },
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
                     }
-                    
-                    val chartEntryModel = entryModelOf(entries)
-                    val marker = rememberMarker()
-                    val chartScrollState = rememberChartScrollState()
 
-                    Chart(
-                        chart = lineChart(
-                            spacing = 2.dp,
-                            axisValuesOverrider = AxisValuesOverrider.fixed(
-                                minY = 50f,
-                                maxY = 200f,
-                                minX = minXValue,
-                                maxX = maxXValue
-                            ),
-                            lines = listOf(
-                                com.patrykandpatrick.vico.core.chart.line.LineChart.LineSpec(
-                                    lineColor = android.graphics.Color.RED,
-                                    lineBackgroundShader = DynamicShaders.fromBrush(
-                                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Red.copy(alpha = 0.4f),
-                                                Color.Transparent
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (showDailyStats) {
+                        // 每日统计柱状图
+                        DailyHeartRateChart(dailyStats = dailyStats)
+                    } else if (entries.isNotEmpty()) {
+                        // 实时趋势折线图
+                        if (timeRangeText.isNotEmpty()) {
+                            Text(
+                                text = timeRangeText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+
+                        val chartEntryModel = entryModelOf(entries)
+                        val marker = rememberMarker()
+                        val chartScrollState = rememberChartScrollState()
+
+                        Chart(
+                            chart = lineChart(
+                                spacing = 2.dp,
+                                axisValuesOverrider = AxisValuesOverrider.fixed(
+                                    minY = 50f,
+                                    maxY = 200f,
+                                    minX = minXValue,
+                                    maxX = maxXValue
+                                ),
+                                lines = listOf(
+                                    com.patrykandpatrick.vico.core.chart.line.LineChart.LineSpec(
+                                        lineColor = android.graphics.Color.RED,
+                                        lineBackgroundShader = DynamicShaders.fromBrush(
+                                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Red.copy(alpha = 0.4f),
+                                                    Color.Transparent
+                                                )
                                             )
                                         )
                                     )
                                 )
-                            )
-                        ),
-                        model = chartEntryModel,
-                        startAxis = rememberStartAxis(
-                            itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = 6),
-                            valueFormatter = { value, _ ->
-                                value.toInt().toString()
-                            }
-                        ),
-                        bottomAxis = rememberBottomAxis(
-                            valueFormatter = xAxisFormatter,
-                            guideline = null
-                        ),
-                        marker = marker,
-                        chartScrollState = chartScrollState,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                            ),
+                            model = chartEntryModel,
+                            startAxis = rememberStartAxis(
+                                itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = 6),
+                                valueFormatter = { value, _ ->
+                                    value.toInt().toString()
+                                }
+                            ),
+                            bottomAxis = rememberBottomAxis(
+                                valueFormatter = xAxisFormatter,
+                                guideline = null
+                            ),
+                            marker = marker,
+                            chartScrollState = chartScrollState,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("暂无趋势数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                        }
+                    }
                 }
             }
         } else {
@@ -450,5 +496,143 @@ fun HistoryItem(time: String, heartRate: Int) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+/**
+ * 每日心率统计柱状图 - 过去7天
+ * 每天显示3根柱子：最高(红)、平均(蓝)、最低(绿)
+ */
+@Composable
+private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
+    if (dailyStats.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("暂无每日数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+        }
+        return
+    }
+
+    val maxBpm = dailyStats.maxOf { it.maxHeartRate }.coerceAtLeast(1)
+    val chartHeight = 180.dp
+    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+    val highColor = Color(0xFFE53935) // 红
+    val avgColor = Color(0xFF1E88E5) // 蓝
+    val lowColor = Color(0xFF43A047) // 绿
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // 柱状图 + 坐标轴
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            // 画坐标轴
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = 1.dp.toPx()
+                // Y 轴
+                drawLine(
+                    color = axisColor,
+                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                    end = androidx.compose.ui.geometry.Offset(0f, size.height),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+                // X 轴
+                drawLine(
+                    color = axisColor,
+                    start = androidx.compose.ui.geometry.Offset(0f, size.height),
+                    end = androidx.compose.ui.geometry.Offset(size.width, size.height),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+            }
+
+            // 柱状图内容
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                dailyStats.forEach { day ->
+                    val highH = (day.maxHeartRate.toFloat() / maxBpm) * (chartHeight.value - 20)
+                    val avgH = (day.avgHeartRate.toFloat() / maxBpm) * (chartHeight.value - 20)
+                    val lowH = (day.minHeartRate.toFloat() / maxBpm) * (chartHeight.value - 20)
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Bottom
+                    ) {
+                        // 最高
+                        Box(
+                            modifier = Modifier
+                                .width(12.dp)
+                                .height(highH.dp.coerceAtLeast(2.dp))
+                                .background(highColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        // 平均
+                        Box(
+                            modifier = Modifier
+                                .width(12.dp)
+                                .height(avgH.dp.coerceAtLeast(2.dp))
+                                .background(avgColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        // 最低
+                        Box(
+                            modifier = Modifier
+                                .width(12.dp)
+                                .height(lowH.dp.coerceAtLeast(2.dp))
+                                .background(lowColor, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // 日期标签
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            dailyStats.forEach { day ->
+                val dateLabel = if (day.date.length >= 10) day.date.substring(5) else day.date
+                Text(
+                    text = dateLabel,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // 图例
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            LegendDot(color = highColor, label = "最高")
+            LegendDot(color = avgColor, label = "平均")
+            LegendDot(color = lowColor, label = "最低")
+        }
+    }
+}
+
+@Composable
+private fun RowScope.LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(modifier = Modifier.size(8.dp).background(color, RoundedCornerShape(2.dp)))
+        Text(text = label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

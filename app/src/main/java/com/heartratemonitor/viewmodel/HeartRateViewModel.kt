@@ -10,6 +10,7 @@ import com.heartratemonitor.data.entity.TimerSessionEntity
 import com.heartratemonitor.data.sync.SyncRepository
 import com.heartratemonitor.data.sync.SyncResult
 import com.heartratemonitor.data.dao.DateCountPair
+import com.heartratemonitor.data.dao.DailyHeartRateStats
 import com.heartratemonitor.ble.BleConnectionManager
 import com.heartratemonitor.ble.BleScanner
 import com.heartratemonitor.ble.DeviceInfo
@@ -64,6 +65,9 @@ class HeartRateViewModel @Inject constructor(
 
     private val _heartRateStats = MutableStateFlow<HeartRateStats?>(null)
     val heartRateStats: StateFlow<HeartRateStats?> = _heartRateStats
+
+    private val _dailyStats = MutableStateFlow<List<DailyHeartRateStats>>(emptyList())
+    val dailyStats: StateFlow<List<DailyHeartRateStats>> = _dailyStats
 
     private val _serviceState = MutableStateFlow<ServiceState>(ServiceState.IDLE)
     val serviceState: StateFlow<ServiceState> = _serviceState
@@ -166,6 +170,12 @@ class HeartRateViewModel @Inject constructor(
                     bleConnectionManager.setLastDeviceAddress(it)
                 }
             }
+        }
+
+        // 加载过去7天的每日心率统计
+        viewModelScope.launch {
+            val sevenDaysAgo = System.currentTimeMillis() - 7 * 24 * 3600 * 1000
+            _dailyStats.value = heartRateRepository.getDailyStats(sevenDaysAgo)
         }
     }
 
