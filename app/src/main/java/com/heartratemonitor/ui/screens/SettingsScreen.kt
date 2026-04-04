@@ -1,9 +1,14 @@
 package com.heartratemonitor.ui.screens
 
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +46,9 @@ import com.heartratemonitor.R
 import com.heartratemonitor.ui.theme.AppColors
 import com.heartratemonitor.ui.theme.toColorString
 import com.heartratemonitor.viewmodel.HeartRateViewModel
+import android.content.Intent
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Close
 
 /**
  * 设置Activity
@@ -72,7 +80,9 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
     val highThreshold by viewModel.highThreshold.collectAsState()
     val lowThreshold by viewModel.lowThreshold.collectAsState()
     val themeColor by viewModel.themeColor.collectAsState()
+    val savedSoundUri by viewModel.timerSoundUri.collectAsState()
     val focusManager = LocalFocusManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var highThresholdInput by remember { mutableStateOf(highThreshold.toString()) }
     var lowThresholdInput by remember { mutableStateOf(lowThreshold.toString()) }
@@ -188,6 +198,13 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
                     }
                 }
             }
+
+            // 倒计时铃声设置卡片
+            TimerSoundSettingCard(
+                savedSoundUri = savedSoundUri,
+                context = context,
+                onSaveSound = { uri -> viewModel.saveTimerSoundUri(uri.toString()) }
+            )
 
             // 提示信息
             Card(
@@ -317,6 +334,113 @@ fun ColorOption(
                 tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
+        }
+    }
+}
+
+/**
+ * 倒计时铃声设置卡片
+ */
+@Composable
+fun TimerSoundSettingCard(
+    savedSoundUri: String?,
+    context: android.content.Context,
+    onSaveSound: (Uri) -> Unit
+) {
+    val soundName = remember(savedSoundUri) {
+        if (savedSoundUri == null) "系统默认" else {
+            try {
+                RingtoneManager.getRingtone(context, Uri.parse(savedSoundUri))?.getTitle(context) ?: "自定义铃声"
+            } catch (_: Exception) {
+                "自定义铃声"
+            }
+        }
+    }
+
+    // 试听 MediaPlayer
+    val previewPlayer = remember { MediaPlayer() }
+    var isPreviewPlaying by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try { previewPlayer.release() } catch (_: Exception) {}
+        }
+    }
+
+    // 铃声选择器
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null) {
+                onSaveSound(uri)
+            }
+        }
+    }
+
+    SettingsCard(title = "倒计时铃声") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "选择倒计时结束时的提示铃声",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // 试听按钮
+                IconButton(onClick = {
+                    try {
+                        if (isPreviewPlaying) {
+                            previewPlayer.stop()
+                            isPreviewPlaying = false
+                        } else {
+                            previewPlayer.reset()
+                            val uri = if (savedSoundUri != null) Uri.parse(savedSoundUri)
+                                else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                            previewPlayer.setDataSource(context, uri)
+                            previewPlayer.setAudioAttributes(
+                                android.media.AudioAttributes.Builder()
+                                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                    .build()
+                            )
+                            previewPlayer.prepare()
+                            previewPlayer.start()
+                            isPreviewPlaying = true
+                            previewPlayer.setOnCompletionListener {
+                                isPreviewPlaying = false
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }) {
+                    Icon(
+                        imageVector = if (isPreviewPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                        contentDescription = if (isPreviewPlaying) "停止试听" else "试听",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                // 当前铃声名称
+                Text(
+                    text = "当前: $soundName",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                // 选择铃声按钮
+                Button(onClick = {
+                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "选择倒计时铃声")
+                        savedSoundUri?.let { putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(it)) }
+                    }
+                    ringtonePickerLauncher.launch(intent)
+                }) {
+                    Text("选择铃声")
+                }
+            }
         }
     }
 }

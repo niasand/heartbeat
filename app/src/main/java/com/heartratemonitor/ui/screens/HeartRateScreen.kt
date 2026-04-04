@@ -402,7 +402,7 @@ fun RealTimeHeartRateScreen(
 
 /**
  * 简易倒计时组件
- * 支持设置分钟和秒、开始/暂停、铃声选择
+ * 支持设置分钟和秒、开始/暂停，倒计时结束播放铃声
  */
 @Composable
 fun CountdownTimerCard() {
@@ -414,7 +414,7 @@ fun CountdownTimerCard() {
 
     val context = LocalContext.current
 
-    // 铃声偏好
+    // 读取铃声偏好
     val preferencesManager = remember {
         EntryPointAccessors.fromApplication(
             context.applicationContext,
@@ -422,20 +422,12 @@ fun CountdownTimerCard() {
         ).preferencesManager()
     }
     var timerSoundUri by remember { mutableStateOf<String?>(null) }
-    var soundName by remember { mutableStateOf("系统默认") }
-
     LaunchedEffect(Unit) {
-        preferencesManager.timerSoundUriFlow.collect { uri ->
-            timerSoundUri = uri
-            soundName = if (uri == null) "系统默认" else {
-                try {
-                    RingtoneManager.getRingtone(context, Uri.parse(uri))?.getTitle(context) ?: "自定义铃声"
-                } catch (_: Exception) {
-                    "自定义铃声"
-                }
-            }
-        }
+        preferencesManager.timerSoundUriFlow.collect { uri -> timerSoundUri = uri }
     }
+
+    // MediaPlayer 持久持有，防止 GC 回收
+    val mediaPlayer = remember { android.media.MediaPlayer() }
 
     // 倒计时逻辑
     LaunchedEffect(isRunning, remainingSeconds) {
@@ -454,10 +446,18 @@ fun CountdownTimerCard() {
             hasPlayed = true
             Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
             try {
+                mediaPlayer.reset()
                 val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
                     else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                val ringtone = RingtoneManager.getRingtone(context, uri)
-                ringtone?.play()
+                mediaPlayer.setDataSource(context, uri)
+                mediaPlayer.setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                mediaPlayer.prepare()
+                mediaPlayer.start()
             } catch (_: Exception) {}
         }
         if (remainingSeconds > 0) {
@@ -465,17 +465,9 @@ fun CountdownTimerCard() {
         }
     }
 
-    // 铃声选择器
-    val ringtonePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            if (uri != null) {
-                GlobalScope.launch {
-                    preferencesManager.saveTimerSoundUri(uri.toString())
-                }
-            }
+    DisposableEffect(Unit) {
+        onDispose {
+            try { mediaPlayer.release() } catch (_: Exception) {}
         }
     }
 
@@ -561,41 +553,6 @@ fun CountdownTimerCard() {
                     enabled = remainingSeconds > 0
                 ) {
                     Text(if (isRunning) "暂停" else "开始")
-                }
-            }
-
-            // 铃声选择 + 试听
-            var previewRingtone by remember { mutableStateOf<Ringtone?>(null) }
-            LaunchedEffect(timerSoundUri) {
-                previewRingtone?.stop()
-                val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
-                    else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                previewRingtone = try { RingtoneManager.getRingtone(context, uri) } catch (_: Exception) { null }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(onClick = {
-                    previewRingtone?.let {
-                        if (it.isPlaying) it.stop() else it.play()
-                    }
-                }) {
-                    Icon(
-                        imageVector = if (previewRingtone?.isPlaying == true) Icons.Default.Close else Icons.Default.PlayArrow,
-                        contentDescription = if (previewRingtone?.isPlaying == true) "停止试听" else "试听",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                TextButton(onClick = {
-                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "选择倒计时铃声")
-                        timerSoundUri?.let { putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(it)) }
-                    }
-                    ringtonePickerLauncher.launch(intent)
-                }) {
-                    Text("铃声: $soundName", fontSize = 12.sp)
                 }
             }
         }

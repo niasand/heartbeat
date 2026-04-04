@@ -85,6 +85,12 @@ class HeartRateViewModel @Inject constructor(
         null
     )
 
+    val timerSoundUri: StateFlow<String?> = preferencesManager.timerSoundUriFlow.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        null
+    )
+
     sealed class ServiceState {
         data object IDLE : ServiceState()
         data object SCANNING : ServiceState()
@@ -236,6 +242,15 @@ class HeartRateViewModel @Inject constructor(
     fun saveThemeColor(value: String) {
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             preferencesManager.saveThemeColor(value)
+        }
+    }
+
+    /**
+     * 保存倒计时铃声 URI
+     */
+    fun saveTimerSoundUri(value: String) {
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            preferencesManager.saveTimerSoundUri(value)
         }
     }
 
