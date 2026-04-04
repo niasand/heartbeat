@@ -34,12 +34,22 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import android.os.Build
 import android.Manifest
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
 import com.heartratemonitor.ble.BleScanner
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.net.Uri
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import dagger.hilt.android.EntryPointAccessors
+import com.heartratemonitor.di.PreferencesEntryPoint
 
 /**
  * 主屏幕 - 心率监测
@@ -388,7 +398,7 @@ fun RealTimeHeartRateScreen(
 
 /**
  * 简易倒计时组件
- * 支持设置分钟和秒、开始/暂停、重置
+ * 支持设置分钟和秒、开始/暂停、铃声选择
  */
 @Composable
 fun CountdownTimerCard() {
@@ -397,6 +407,31 @@ fun CountdownTimerCard() {
     var isRunning by remember { mutableStateOf(false) }
     var inputMinutes by remember { mutableStateOf("0") }
     var inputSeconds by remember { mutableStateOf("40") }
+
+    val context = LocalContext.current
+
+    // 铃声偏好
+    val preferencesManager = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            PreferencesEntryPoint::class.java
+        ).preferencesManager()
+    }
+    var timerSoundUri by remember { mutableStateOf<String?>(null) }
+    var soundName by remember { mutableStateOf("系统默认") }
+
+    LaunchedEffect(Unit) {
+        preferencesManager.timerSoundUriFlow.collect { uri ->
+            timerSoundUri = uri
+            soundName = if (uri == null) "系统默认" else {
+                try {
+                    RingtoneManager.getRingtone(context, Uri.parse(uri))?.getTitle(context) ?: "自定义铃声"
+                } catch (_: Exception) {
+                    "自定义铃声"
+                }
+            }
+        }
+    }
 
     // 倒计时逻辑
     LaunchedEffect(isRunning, remainingSeconds) {
@@ -408,11 +443,35 @@ fun CountdownTimerCard() {
         }
     }
 
-    // 倒计时结束提示
-    val context = LocalContext.current
+    // 倒计时结束：播放铃声 + Toast
+    var hasPlayed by remember { mutableStateOf(false) }
     LaunchedEffect(remainingSeconds, isRunning) {
-        if (remainingSeconds == 0 && !isRunning) {
+        if (remainingSeconds == 0 && !isRunning && !hasPlayed) {
+            hasPlayed = true
             Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
+            try {
+                val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
+                    else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                val ringtone = RingtoneManager.getRingtone(context, uri)
+                ringtone?.play()
+            } catch (_: Exception) {}
+        }
+        if (remainingSeconds > 0) {
+            hasPlayed = false
+        }
+    }
+
+    // 铃声选择器
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null) {
+                GlobalScope.launch {
+                    preferencesManager.saveTimerSoundUri(uri.toString())
+                }
+            }
         }
     }
 
@@ -497,6 +556,18 @@ fun CountdownTimerCard() {
                 ) {
                     Text(if (isRunning) "暂停" else "开始")
                 }
+            }
+
+            // 铃声选择
+            TextButton(onClick = {
+                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "选择倒计时铃声")
+                    timerSoundUri?.let { putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(it)) }
+                }
+                ringtonePickerLauncher.launch(intent)
+            }) {
+                Text("铃声: $soundName", fontSize = 12.sp)
             }
         }
     }

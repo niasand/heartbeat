@@ -50,6 +50,8 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         private val THEME_COLOR_KEY = stringPreferencesKey("theme_color")
         // 上次使用的设备地址
         private val LAST_DEVICE_ADDRESS_KEY = stringPreferencesKey("last_device_address")
+        // 倒计时铃声 URI
+        private val TIMER_SOUND_URI_KEY = stringPreferencesKey("timer_sound_uri")
 
         // 默认值
         const val DEFAULT_HIGH_THRESHOLD = 180
@@ -83,6 +85,13 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
      */
     val lastDeviceAddressFlow: Flow<String?> = dataStore.data.map { preferences ->
         preferences[LAST_DEVICE_ADDRESS_KEY]
+    }
+
+    /**
+     * 获取倒计时铃声 URI
+     */
+    val timerSoundUriFlow: Flow<String?> = dataStore.data.map { preferences ->
+        preferences[TIMER_SOUND_URI_KEY]
     }
 
     init {
@@ -131,6 +140,15 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     suspend fun saveLastDeviceAddress(value: String) {
         dataStore.edit { preferences ->
             preferences[LAST_DEVICE_ADDRESS_KEY] = value
+        }
+    }
+
+    /**
+     * 保存倒计时铃声 URI
+     */
+    suspend fun saveTimerSoundUri(value: String) {
+        dataStore.edit { preferences ->
+            preferences[TIMER_SOUND_URI_KEY] = value
         }
     }
 }
