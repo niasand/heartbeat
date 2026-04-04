@@ -7,6 +7,8 @@ import com.heartratemonitor.data.pref.PreferencesManager
 import com.heartratemonitor.data.repository.HeartRateRepository
 import com.heartratemonitor.data.repository.TimerSessionRepository
 import com.heartratemonitor.data.entity.TimerSessionEntity
+import com.heartratemonitor.data.sync.SyncRepository
+import com.heartratemonitor.data.sync.SyncResult
 import com.heartratemonitor.data.dao.DateCountPair
 import com.heartratemonitor.ble.BleConnectionManager
 import com.heartratemonitor.ble.BleScanner
@@ -41,6 +43,7 @@ class HeartRateViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager,
     private val bleScanner: BleScanner,
     private val bleConnectionManager: BleConnectionManager,
+    private val syncRepository: SyncRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -106,6 +109,22 @@ class HeartRateViewModel @Inject constructor(
         SharingStarted.Eagerly,
         emptyList()
     )
+
+    private val _syncState = MutableStateFlow<SyncState>(SyncState.IDLE)
+    val syncState: StateFlow<SyncState> = _syncState
+
+    val lastSyncTime: StateFlow<Long> = preferencesManager.lastSyncTimeFlow.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        0L
+    )
+
+    sealed class SyncState {
+        data object IDLE : SyncState()
+        data object SYNCING : SyncState()
+        data class SUCCESS(val syncedHeartRates: Int, val syncedTimerSessions: Int) : SyncState()
+        data class ERROR(val message: String) : SyncState()
+    }
 
     sealed class ServiceState {
         data object IDLE : ServiceState()
@@ -276,6 +295,21 @@ class HeartRateViewModel @Inject constructor(
     fun saveTimerSoundUri(value: String) {
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             preferencesManager.saveTimerSoundUri(value)
+        }
+    }
+
+    /**
+     * Sync local data to Cloudflare D1
+     */
+    fun syncToCloud() {
+        viewModelScope.launch {
+            _syncState.value = SyncState.SYNCING
+            val result = syncRepository.syncToCloud()
+            _syncState.value = if (result.success) {
+                SyncState.SUCCESS(result.syncedHeartRates, result.syncedTimerSessions)
+            } else {
+                SyncState.ERROR(result.error ?: "Sync failed")
+            }
         }
     }
 

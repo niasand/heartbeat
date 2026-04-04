@@ -26,6 +26,9 @@ interface TimerSessionDao {
 
     @Query("DELETE FROM timer_sessions")
     suspend fun deleteAll()
+
+    @Query("SELECT * FROM timer_sessions WHERE timestamp > :afterTimestamp ORDER BY timestamp ASC")
+    suspend fun getAfter(afterTimestamp: Long): List<TimerSessionEntity>
 }
 
 data class DateCountPair(

@@ -52,6 +52,9 @@ import com.heartratemonitor.viewmodel.HeartRateViewModel
 import android.content.Intent
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Close
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 设置Activity
@@ -84,6 +87,8 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
     val lowThreshold by viewModel.lowThreshold.collectAsState()
     val themeColor by viewModel.themeColor.collectAsState()
     val savedSoundUri by viewModel.timerSoundUri.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
+    val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val focusManager = LocalFocusManager.current
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -207,6 +212,13 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
                 savedSoundUri = savedSoundUri,
                 context = context,
                 onSaveSound = { uri -> viewModel.saveTimerSoundUri(uri.toString()) }
+            )
+
+            // 数据同步卡片
+            DataSyncCard(
+                syncState = syncState,
+                lastSyncTime = lastSyncTime,
+                onSync = { viewModel.syncToCloud() }
             )
 
             // 提示信息
@@ -556,4 +568,93 @@ private fun RingtonePickerDialog(
             }
         }
     )
+}
+
+/**
+ * 数据同步卡片
+ */
+@Composable
+fun DataSyncCard(
+    syncState: com.heartratemonitor.viewmodel.HeartRateViewModel.SyncState,
+    lastSyncTime: Long,
+    onSync: () -> Unit
+) {
+    val isSyncing = syncState is com.heartratemonitor.viewmodel.HeartRateViewModel.SyncState.SYNCING
+
+    SettingsCard(title = "数据同步") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "将心率数据和计时记录同步到云端备份",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // 上次同步时间
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (lastSyncTime > 0) {
+                        "上次同步: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(Date(lastSyncTime))}"
+                    } else {
+                        "尚未同步"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 同步按钮
+            Button(
+                onClick = onSync,
+                enabled = !isSyncing,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("同步中...")
+                } else {
+                    Text("同步到云端")
+                }
+            }
+
+            // 同步结果反馈
+            when (syncState) {
+                is com.heartratemonitor.viewmodel.HeartRateViewModel.SyncState.SUCCESS -> {
+                    val state = syncState
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFE8F5E9)
+                    ) {
+                        Text(
+                            text = "同步成功！心率 ${state.syncedHeartRates} 条，计时 ${state.syncedTimerSessions} 条",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
+                }
+                is com.heartratemonitor.viewmodel.HeartRateViewModel.SyncState.ERROR -> {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFFEBEE)
+                    ) {
+                        Text(
+                            text = "同步失败: ${syncState.message}",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFC62828)
+                        )
+                    }
+                }
+                else -> {}
+            }
+        }
+    }
 }

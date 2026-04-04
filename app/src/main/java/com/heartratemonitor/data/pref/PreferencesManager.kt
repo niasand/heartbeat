@@ -52,6 +52,8 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         private val LAST_DEVICE_ADDRESS_KEY = stringPreferencesKey("last_device_address")
         // 倒计时铃声 URI
         private val TIMER_SOUND_URI_KEY = stringPreferencesKey("timer_sound_uri")
+        // 上次同步时间
+        private val LAST_SYNC_TIME_KEY = longPreferencesKey("last_sync_time")
 
         // 默认值
         const val DEFAULT_HIGH_THRESHOLD = 180
@@ -92,6 +94,13 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
      */
     val timerSoundUriFlow: Flow<String?> = dataStore.data.map { preferences ->
         preferences[TIMER_SOUND_URI_KEY]
+    }
+
+    /**
+     * 获取上次同步时间
+     */
+    val lastSyncTimeFlow: Flow<Long> = dataStore.data.map { preferences ->
+        preferences[LAST_SYNC_TIME_KEY] ?: 0L
     }
 
     init {
@@ -149,6 +158,15 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     suspend fun saveTimerSoundUri(value: String) {
         dataStore.edit { preferences ->
             preferences[TIMER_SOUND_URI_KEY] = value
+        }
+    }
+
+    /**
+     * 保存上次同步时间
+     */
+    suspend fun saveLastSyncTime(value: Long) {
+        dataStore.edit { preferences ->
+            preferences[LAST_SYNC_TIME_KEY] = value
         }
     }
 }

@@ -74,6 +74,12 @@ interface HeartRateDao {
      */
     @Query("DELETE FROM heart_rates")
     suspend fun deleteAll()
+
+    /**
+     * 获取指定时间之后的心率数据（增量同步用）
+     */
+    @Query("SELECT * FROM heart_rates WHERE timestamp > :afterTimestamp ORDER BY timestamp ASC")
+    suspend fun getAfter(afterTimestamp: Long): List<HeartRateEntity>
 }
 
 /**
