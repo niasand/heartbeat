@@ -32,7 +32,7 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
             countByDate = countByDate,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp)
+                .height(200.dp)
                 .padding(16.dp)
         )
 
@@ -111,8 +111,16 @@ private fun TimerBarChart(
         return
     }
 
-    val maxCount = (countByDate.maxOfOrNull { it.count } ?: 1).coerceAtLeast(1)
-    val chartHeight = 140.dp
+    val recentData = countByDate.takeLast(7)
+    if (recentData.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text("暂无数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+        }
+        return
+    }
+
+    val maxCount = (recentData.maxOfOrNull { it.count } ?: 1).coerceAtLeast(1)
+    val chartHeight = 160.dp
 
     Column(modifier = modifier) {
         Text(
@@ -126,10 +134,10 @@ private fun TimerBarChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(chartHeight),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(1.dp),
             verticalAlignment = Alignment.Bottom
         ) {
-            countByDate.forEach { pair ->
+            recentData.forEach { pair ->
                 val dateLabel = pair.date.substring(5) // MM-DD
                 val barHeight = (pair.count.toFloat() / maxCount) * chartHeight.value.coerceAtLeast(1f)
 
