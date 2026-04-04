@@ -14,6 +14,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +44,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.background
 import com.heartratemonitor.R
 import com.heartratemonitor.ui.theme.AppColors
 import com.heartratemonitor.ui.theme.toColorString
@@ -339,7 +342,7 @@ fun ColorOption(
 }
 
 /**
- * 倒计时铃声设置卡片
+ * 倒计时铃声设置卡片（自建弹窗，点击即试听）
  */
 @Composable
 fun TimerSoundSettingCard(
@@ -357,9 +360,10 @@ fun TimerSoundSettingCard(
         }
     }
 
-    // 试听 MediaPlayer
     val previewPlayer = remember { MediaPlayer() }
     var isPreviewPlaying by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
+    var playingUri by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -367,7 +371,6 @@ fun TimerSoundSettingCard(
         }
     }
 
-    // 播放指定铃声的公共方法
     fun playPreview(uri: Uri) {
         try {
             previewPlayer.stop()
@@ -382,25 +385,21 @@ fun TimerSoundSettingCard(
             previewPlayer.prepare()
             previewPlayer.start()
             isPreviewPlaying = true
+            playingUri = uri.toString()
             previewPlayer.setOnCompletionListener {
                 isPreviewPlaying = false
+                playingUri = null
             }
         } catch (_: Exception) {}
     }
 
-    // 铃声选择器 — 选中后自动试听
-    val ringtonePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            if (uri != null) {
-                onSaveSound(uri)
-                playPreview(uri)
-            }
-        }
+    fun stopPreview() {
+        try { previewPlayer.stop() } catch (_: Exception) {}
+        isPreviewPlaying = false
+        playingUri = null
     }
 
+    // 试听当前铃声按钮
     SettingsCard(title = "倒计时铃声") {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
@@ -413,12 +412,8 @@ fun TimerSoundSettingCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // 试听按钮
                 IconButton(onClick = {
-                    if (isPreviewPlaying) {
-                        previewPlayer.stop()
-                        isPreviewPlaying = false
-                    } else {
+                    if (isPreviewPlaying) stopPreview() else {
                         val uri = if (savedSoundUri != null) Uri.parse(savedSoundUri)
                             else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                         playPreview(uri)
@@ -426,28 +421,139 @@ fun TimerSoundSettingCard(
                 }) {
                     Icon(
                         imageVector = if (isPreviewPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
-                        contentDescription = if (isPreviewPlaying) "停止试听" else "试听",
+                        contentDescription = if (isPreviewPlaying) "停止" else "试听",
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                // 当前铃声名称
                 Text(
                     text = "当前: $soundName",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f)
                 )
-                // 选择铃声按钮
-                Button(onClick = {
-                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "选择倒计时铃声")
-                        savedSoundUri?.let { putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(it)) }
-                    }
-                    ringtonePickerLauncher.launch(intent)
-                }) {
+                Button(onClick = { showPicker = true }) {
                     Text("选择铃声")
                 }
             }
         }
     }
+
+    // 自建铃声选择弹窗
+    if (showPicker) {
+        RingtonePickerDialog(
+            currentUri = savedSoundUri,
+            playingUri = playingUri,
+            context = context,
+            onPlay = { playPreview(it) },
+            onStop = { stopPreview() },
+            onDismiss = { stopPreview(); showPicker = false },
+            onConfirm = { uri ->
+                onSaveSound(uri)
+                showPicker = false
+            }
+        )
+    }
+}
+
+/**
+ * 自建铃声选择弹窗 — 点击列表项即时播放试听
+ */
+@Composable
+private fun RingtonePickerDialog(
+    currentUri: String?,
+    playingUri: String?,
+    context: android.content.Context,
+    onPlay: (Uri) -> Unit,
+    onStop: () -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: (Uri) -> Unit
+) {
+    // 获取系统通知铃声列表
+    val ringtoneList = remember {
+        val cursor = RingtoneManager(context).also {
+            it.setType(RingtoneManager.TYPE_NOTIFICATION)
+        }.cursor
+        val list = mutableListOf<Pair<String, String>>() // title to uriString
+        if (cursor != null) {
+            while (cursor.moveToNext()) {
+                val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX) ?: ""
+                val uri = cursor.getString(RingtoneManager.URI_COLUMN_INDEX) + "/" + cursor.getString(RingtoneManager.ID_COLUMN_INDEX)
+                list.add(title to uri)
+            }
+            cursor.close()
+        }
+        list
+    }
+
+    var selectedUri by remember(currentUri) { mutableStateOf(currentUri) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择倒计时铃声") },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+            ) {
+                items(ringtoneList.size) { index ->
+                    val (title, uri) = ringtoneList[index]
+                    val isSelected = uri == selectedUri
+                    val isPlaying = uri == playingUri
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedUri = uri
+                                onPlay(Uri.parse(uri))
+                            }
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                else Color.Transparent
+                            )
+                            .padding(horizontal = 12.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 试听/停止图标
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "停止" else "试听",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "已选中",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    if (index < ringtoneList.size - 1) {
+                        androidx.compose.material3.HorizontalDivider()
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onStop()
+                selectedUri?.let { onConfirm(Uri.parse(it)) }
+            }) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
