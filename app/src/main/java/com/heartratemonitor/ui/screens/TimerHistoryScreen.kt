@@ -126,7 +126,7 @@ private fun TimerBarChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(chartHeight),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.Bottom
         ) {
             countByDate.forEach { pair ->
@@ -135,22 +135,22 @@ private fun TimerBarChart(
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.Top,
                     modifier = Modifier.weight(1f)
                 ) {
-                    // Count label
+                    // Count label — 显示在柱子上方
                     Text(
-                        text = pair.count.toString(),
-                        fontSize = 11.sp,
+                        text = "${pair.count}次",
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     // Bar
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(barHeight.dp.coerceAtLeast(4.dp))
-                            .padding(horizontal = 2.dp)
                     ) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
@@ -158,7 +158,8 @@ private fun TimerBarChart(
                             shape = MaterialTheme.shapes.extraSmall
                         ) {}
                     }
-                    // Date label
+                    Spacer(modifier = Modifier.height(2.dp))
+                    // Date label — 显示在柱子下方
                     Text(
                         text = dateLabel,
                         fontSize = 10.sp,
