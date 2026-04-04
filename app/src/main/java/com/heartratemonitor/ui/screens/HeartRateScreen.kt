@@ -346,6 +346,9 @@ fun RealTimeHeartRateScreen(
                 Text(stringResource(R.string.scan_device))
             }
         }
+
+        // 倒计时
+        CountdownTimerCard()
     }
 
     // 设备选择对话框
@@ -379,6 +382,120 @@ fun RealTimeHeartRateScreen(
         val state = viewModel.connectionState.value
         if (state is ConnectionState.CONNECTING) {
             viewModel.disconnect()
+        }
+    }
+}
+
+/**
+ * 简易倒计时组件
+ * 支持设置分钟数、开始/暂停、重置
+ */
+@Composable
+fun CountdownTimerCard() {
+    var totalSeconds by remember { mutableIntStateOf(60) }
+    var remainingSeconds by remember { mutableIntStateOf(60) }
+    var isRunning by remember { mutableStateOf(false) }
+    var inputMinutes by remember { mutableStateOf("1") }
+
+    // 倒计时逻辑
+    LaunchedEffect(isRunning, remainingSeconds) {
+        if (isRunning && remainingSeconds > 0) {
+            delay(1000L)
+            remainingSeconds--
+        } else if (remainingSeconds == 0) {
+            isRunning = false
+        }
+    }
+
+    // 倒计时结束提示
+    val context = LocalContext.current
+    LaunchedEffect(remainingSeconds, isRunning) {
+        if (remainingSeconds == 0 && !isRunning) {
+            Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "倒计时",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+            )
+
+            // 倒计时显示 MM:SS
+            val minutes = remainingSeconds / 60
+            val seconds = remainingSeconds % 60
+            Text(
+                text = "%02d:%02d".format(minutes, seconds),
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (remainingSeconds == 0) AppColors.HeartRateCritical
+                    else MaterialTheme.colorScheme.onSecondaryContainer
+            )
+
+            // 设置分钟数（仅停止时可编辑）
+            if (!isRunning && remainingSeconds == totalSeconds) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("分钟：", fontSize = 14.sp)
+                    OutlinedTextField(
+                        value = inputMinutes,
+                        onValueChange = { text ->
+                            if (text.isEmpty() || text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..999 } == true) {
+                                inputMinutes = text
+                            }
+                        },
+                        modifier = Modifier.width(80.dp),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
+                    )
+                    Button(
+                        onClick = {
+                            val mins = inputMinutes.toIntOrNull() ?: 1
+                            totalSeconds = mins.coerceAtLeast(1) * 60
+                            remainingSeconds = totalSeconds
+                        }
+                    ) {
+                        Text("确认")
+                    }
+                }
+            }
+
+            // 控制按钮
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = { isRunning = !isRunning },
+                    enabled = remainingSeconds > 0
+                ) {
+                    Text(if (isRunning) "暂停" else "开始")
+                }
+                OutlinedButton(onClick = {
+                    isRunning = false
+                    val mins = inputMinutes.toIntOrNull() ?: 1
+                    totalSeconds = mins.coerceAtLeast(1) * 60
+                    remainingSeconds = totalSeconds
+                }) {
+                    Text("重置")
+                }
+            }
         }
     }
 }
