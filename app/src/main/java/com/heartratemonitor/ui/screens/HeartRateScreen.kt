@@ -253,11 +253,9 @@ fun RealTimeHeartRateScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // 心率显示卡片
+        // 心率显示卡片（紧凑版）
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f),
+            modifier = Modifier.size(120.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -271,7 +269,7 @@ fun RealTimeHeartRateScreen(
                 // 状态指示器
                 Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
                         .background(
                             when (connectionState) {
@@ -284,12 +282,12 @@ fun RealTimeHeartRateScreen(
                         )
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // 心率数值
                 Text(
                     text = (currentHeartRate ?: "--").toString(),
-                    fontSize = 120.sp,
+                    fontSize = 40.sp,
                     fontWeight = FontWeight.Bold,
                     color = when {
                         currentHeartRate == null -> Color.Gray
@@ -302,12 +300,12 @@ fun RealTimeHeartRateScreen(
                 // BPM标签
                 Text(
                     text = stringResource(R.string.bpm),
-                    fontSize = 24.sp,
+                    fontSize = 8.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // 连接状态
                 Text(
@@ -322,7 +320,7 @@ fun RealTimeHeartRateScreen(
                         }
                         else -> stringResource(R.string.disconnected)
                     },
-                    fontSize = 16.sp,
+                    fontSize = 8.sp,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
             }
