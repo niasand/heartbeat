@@ -1,0 +1,8 @@
+name = "fitness-heart-sync"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fitness_heart"
+database_id = "fd241929-4a63-45c9-baa4-2b50ba54f393"
