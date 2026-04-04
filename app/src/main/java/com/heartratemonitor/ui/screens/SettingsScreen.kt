@@ -367,7 +367,28 @@ fun TimerSoundSettingCard(
         }
     }
 
-    // 铃声选择器
+    // 播放指定铃声的公共方法
+    fun playPreview(uri: Uri) {
+        try {
+            previewPlayer.stop()
+            previewPlayer.reset()
+            previewPlayer.setDataSource(context, uri)
+            previewPlayer.setAudioAttributes(
+                android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            previewPlayer.prepare()
+            previewPlayer.start()
+            isPreviewPlaying = true
+            previewPlayer.setOnCompletionListener {
+                isPreviewPlaying = false
+            }
+        } catch (_: Exception) {}
+    }
+
+    // 铃声选择器 — 选中后自动试听
     val ringtonePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -375,6 +396,7 @@ fun TimerSoundSettingCard(
             val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
             if (uri != null) {
                 onSaveSound(uri)
+                playPreview(uri)
             }
         }
     }
@@ -393,29 +415,14 @@ fun TimerSoundSettingCard(
             ) {
                 // 试听按钮
                 IconButton(onClick = {
-                    try {
-                        if (isPreviewPlaying) {
-                            previewPlayer.stop()
-                            isPreviewPlaying = false
-                        } else {
-                            previewPlayer.reset()
-                            val uri = if (savedSoundUri != null) Uri.parse(savedSoundUri)
-                                else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                            previewPlayer.setDataSource(context, uri)
-                            previewPlayer.setAudioAttributes(
-                                android.media.AudioAttributes.Builder()
-                                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                                    .build()
-                            )
-                            previewPlayer.prepare()
-                            previewPlayer.start()
-                            isPreviewPlaying = true
-                            previewPlayer.setOnCompletionListener {
-                                isPreviewPlaying = false
-                            }
-                        }
-                    } catch (_: Exception) {}
+                    if (isPreviewPlaying) {
+                        previewPlayer.stop()
+                        isPreviewPlaying = false
+                    } else {
+                        val uri = if (savedSoundUri != null) Uri.parse(savedSoundUri)
+                            else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                        playPreview(uri)
+                    }
                 }) {
                     Icon(
                         imageVector = if (isPreviewPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
