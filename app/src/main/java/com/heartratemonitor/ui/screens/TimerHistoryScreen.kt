@@ -1,5 +1,6 @@
 package com.heartratemonitor.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +10,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -119,6 +122,7 @@ private fun TimerBarChart(
 
     val maxCount = (recentData.maxOfOrNull { it.count } ?: 1).coerceAtLeast(1)
     val barAreaHeight = 140.dp
+    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
 
     Column(modifier = modifier) {
         Text(
@@ -128,22 +132,43 @@ private fun TimerBarChart(
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        // 柱状图区域（固定高度，不含日期标签）
-        Column(
+        // 柱状图 + 坐标轴
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(barAreaHeight),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .height(barAreaHeight)
         ) {
+            // 画坐标轴: Y轴(左侧竖线) + X轴(底部横线)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = 1.dp.toPx()
+                drawLine(
+                    color = axisColor,
+                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                    end = androidx.compose.ui.geometry.Offset(0f, size.height),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = axisColor,
+                    start = androidx.compose.ui.geometry.Offset(0f, size.height),
+                    end = androidx.compose.ui.geometry.Offset(size.width, size.height),
+                    strokeWidth = strokeWidth,
+                    cap = StrokeCap.Round
+                )
+            }
+
+            // 柱状图（加左内边距避开Y轴）
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .padding(start = 4.dp)
+                    .fillMaxHeight(),
                 horizontalArrangement = Arrangement.spacedBy(1.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
                 recentData.forEach { pair ->
-                    val barHeight = (pair.count.toFloat() / maxCount) * barAreaHeight.value.coerceAtLeast(1f)
+                    val barHeight = (pair.count.toFloat() / maxCount) * (barAreaHeight.value - 16) // 留空间给计数标签
+                        .coerceAtLeast(1f)
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -177,9 +202,11 @@ private fun TimerBarChart(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // 日期标签（在柱状图区域外部，不会被裁剪）
+        // X轴日期标签
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             recentData.forEach { pair ->
