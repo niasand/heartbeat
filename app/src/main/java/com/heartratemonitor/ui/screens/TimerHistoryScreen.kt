@@ -120,7 +120,7 @@ private fun TimerBarChart(
     }
 
     val maxCount = (recentData.maxOfOrNull { it.count } ?: 1).coerceAtLeast(1)
-    val chartHeight = 160.dp
+    val barAreaHeight = 140.dp
 
     Column(modifier = modifier) {
         Text(
@@ -130,50 +130,69 @@ private fun TimerBarChart(
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        Row(
+        // 柱状图区域（固定高度，不含日期标签）
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(chartHeight),
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
-            verticalAlignment = Alignment.Bottom
+                .height(barAreaHeight),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(1.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                recentData.forEach { pair ->
+                    val barHeight = (pair.count.toFloat() / maxCount) * barAreaHeight.value.coerceAtLeast(1f)
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Bottom,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        // Count label
+                        Text(
+                            text = "${pair.count}次",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        // Bar
+                        Box(
+                            modifier = Modifier
+                                .width(28.dp)
+                                .height(barHeight.dp.coerceAtLeast(4.dp))
+                        ) {
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = MaterialTheme.shapes.extraSmall
+                            ) {}
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // 日期标签（在柱状图区域外部，不会被裁剪）
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             recentData.forEach { pair ->
                 val dateLabel = pair.date.substring(5) // MM-DD
-                val barHeight = (pair.count.toFloat() / maxCount) * chartHeight.value.coerceAtLeast(1f)
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Top,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    // Count label — 显示在柱子上方
-                    Text(
-                        text = "${pair.count}次",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    // Bar
-                    Box(
-                        modifier = Modifier
-                            .width(28.dp)
-                            .height(barHeight.dp.coerceAtLeast(4.dp))
-                    ) {
-                        Surface(
-                            modifier = Modifier.fillMaxSize(),
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = MaterialTheme.shapes.extraSmall
-                        ) {}
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    // Date label — 显示在柱子下方
-                    Text(
-                        text = dateLabel,
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = dateLabel,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         }
     }
