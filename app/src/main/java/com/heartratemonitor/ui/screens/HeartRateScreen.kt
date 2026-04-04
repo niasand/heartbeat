@@ -388,7 +388,7 @@ fun RealTimeHeartRateScreen(
 
 /**
  * 简易倒计时组件
- * 支持设置分钟数、开始/暂停、重置
+ * 支持设置分钟和秒、开始/暂停、重置
  */
 @Composable
 fun CountdownTimerCard() {
@@ -396,6 +396,7 @@ fun CountdownTimerCard() {
     var remainingSeconds by remember { mutableIntStateOf(60) }
     var isRunning by remember { mutableStateOf(false) }
     var inputMinutes by remember { mutableStateOf("1") }
+    var inputSeconds by remember { mutableStateOf("0") }
 
     // 倒计时逻辑
     LaunchedEffect(isRunning, remainingSeconds) {
@@ -447,29 +448,45 @@ fun CountdownTimerCard() {
                     else MaterialTheme.colorScheme.onSecondaryContainer
             )
 
-            // 设置分钟数（仅停止时可编辑）
+            // 设置分钟和秒（仅停止且未开始时可编辑）
             if (!isRunning && remainingSeconds == totalSeconds) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("分钟：", fontSize = 14.sp)
+                    Text("分", fontSize = 14.sp)
                     OutlinedTextField(
                         value = inputMinutes,
                         onValueChange = { text ->
-                            if (text.isEmpty() || text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..999 } == true) {
+                            if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..999 } == true)) {
                                 inputMinutes = text
                             }
                         },
-                        modifier = Modifier.width(80.dp),
+                        modifier = Modifier.width(64.dp),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
+                    )
+                    Text("秒", fontSize = 14.sp)
+                    OutlinedTextField(
+                        value = inputSeconds,
+                        onValueChange = { text ->
+                            if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..59 } == true)) {
+                                inputSeconds = text
+                            }
+                        },
+                        modifier = Modifier.width(64.dp),
                         singleLine = true,
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                     )
                     Button(
                         onClick = {
-                            val mins = inputMinutes.toIntOrNull() ?: 1
-                            totalSeconds = mins.coerceAtLeast(1) * 60
-                            remainingSeconds = totalSeconds
+                            val mins = inputMinutes.toIntOrNull() ?: 0
+                            val secs = inputSeconds.toIntOrNull() ?: 0
+                            val total = mins * 60 + secs
+                            if (total > 0) {
+                                totalSeconds = total
+                                remainingSeconds = total
+                            }
                         }
                     ) {
                         Text("确认")
@@ -489,8 +506,10 @@ fun CountdownTimerCard() {
                 }
                 OutlinedButton(onClick = {
                     isRunning = false
-                    val mins = inputMinutes.toIntOrNull() ?: 1
-                    totalSeconds = mins.coerceAtLeast(1) * 60
+                    val mins = inputMinutes.toIntOrNull() ?: 0
+                    val secs = inputSeconds.toIntOrNull() ?: 0
+                    val total = mins * 60 + secs
+                    totalSeconds = if (total > 0) total else 60
                     remainingSeconds = totalSeconds
                 }) {
                     Text("重置")
