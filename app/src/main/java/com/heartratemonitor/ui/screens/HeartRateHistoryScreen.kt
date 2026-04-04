@@ -375,7 +375,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
             ) {
                 items(recentHeartRateHistory) { entity ->
                     HistoryItem(
-                        time = viewModel.formatTimestamp(entity.timestamp),
+                        time = viewModel.formatDate(entity.timestamp),
                         heartRate = entity.heartRate
                     )
                 }
