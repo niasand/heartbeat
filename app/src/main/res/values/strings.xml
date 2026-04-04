@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">心率监测</string>
+    <string name="heart_rate">心率</string>
+    <string name="bpm">BPM</string>
+    <string name="connecting">连接中...</string>
+    <string name="connected">已连接</string>
+    <string name="disconnected">未连接</string>
+    <string name="scan_device">扫描设备</string>
+    <string name="stop_scan">停止扫描</string>
+    <string name="settings">设置</string>
+    <string name="history">历史</string>
+    <string name="high_threshold_warning">心率过高警告</string>
+    <string name="low_threshold_warning">心率过低警告</string>
+    <string name="service_title">心率监测服务</string>
+    <string name="service_content">正在监测心率 %d BPM</string>
+    <string name="threshold_high">高心率阈值</string>
+    <string name="threshold_low">低心率阈值</string>
+    <string name="theme_color">主题颜色</string>
+    <string name="save">保存</string>
+</resources>

@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "pre_edit": "echo \"Before editing: Check variable scope for composables and ensure proper state hoisting\"",
+    "post_edit": "echo \"After editing: Consider running tests or building APK to verify changes work correctly\"",
+    "pre_commit": "git status --short | grep \"^ M\" | head -5 && echo \"\\nReview staged changes before committing. Check: variable scope, imports, and version numbers.\""
+  }
+}

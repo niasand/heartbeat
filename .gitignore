@@ -1,0 +1,52 @@
+# Android
+*.iml
+.gradle/
+local.properties
+.DS_Store
+/build/
+captures/
+.externalNativeBuild
+.cxx/
+
+# Android Studio
+.idea/
+*.hprof
+*.log
+
+# Kotlin
+*.kotlin_module
+
+# Built application files
+*.apk
+*.aab
+
+# Build directories
+/build/
+app/build/
+*/build/
+
+# Room database files
+*.db
+*.db-shm
+*.db-wal
+
+# Keystore files (security - do not commit)
+*.keystore
+*.jks
+debug.keystore
+
+# Environment files (may contain sensitive data)
+.env
+.env.local
+deployment.config.json
+# Log directories
+log/
+
+# VS Code
+.vscode/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Security documentation (local reference only)
+SECURITY.md
