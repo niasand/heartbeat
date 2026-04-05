@@ -171,7 +171,8 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     }
 
     // 准备图表数据 (从数据库取最近3小时，图表展示最新2小时)
-    val chartData: Any = remember(allHeartRateHistory, tick) {
+    // 只在数据变化时重新过滤，不受 tick 驱动，避免全量历史扫描
+    val chartData: Any = remember(allHeartRateHistory) {
         if (allHeartRateHistory.isEmpty()) {
             Triple(emptyList<FloatEntry>(), 0L, 0)
         } else {
@@ -199,7 +200,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
             }
         }
     }
-    
+
     // Extract chart data and base time
     val entries = if (chartData is Triple<*, *, *>) (chartData as Triple<List<FloatEntry>, Long, Int>).first else emptyList<FloatEntry>()
     val baseTime = if (chartData is Triple<*, *, *>) (chartData as Triple<List<FloatEntry>, Long, Int>).second else 0L
