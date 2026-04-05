@@ -12,9 +12,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("release.keystore")
-            storePassword = "heart-rate-monitor-keystore-password"
-            keyAlias = "heart-rate-monitor"
-            keyPassword = "heart-rate-monitor-keystore-password"
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "heartmonitor2024"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "heart-rate-monitor"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "heartmonitor2024"
         }
     }
 
