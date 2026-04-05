@@ -1,5 +1,6 @@
 package com.heartratemonitor.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,6 +38,7 @@ import com.heartratemonitor.ble.AutoReconnectState
 import com.heartratemonitor.ui.screens.SettingsActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.GlobalScope
@@ -424,6 +427,7 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
     var isRunning by remember { mutableStateOf(false) }
     var inputMinutes by remember { mutableStateOf("0") }
     var inputSeconds by remember { mutableStateOf("40") }
+    var tagInput by remember { mutableStateOf("") }
 
     val context = LocalContext.current
 
@@ -458,7 +462,7 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
         if (remainingSeconds == 0 && !isRunning && !hasPlayed) {
             hasPlayed = true
             Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
-            viewModel.saveTimerSession(totalSeconds)
+            viewModel.saveTimerSession(totalSeconds, tagInput.ifBlank { null })
             try {
                 mediaPlayer.reset()
                 val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
@@ -505,6 +509,41 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
             )
+
+            // 标签输入
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.06f),
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
+                )
+            ) {
+                BasicTextField(
+                    value = tagInput,
+                    onValueChange = { tagInput = it },
+                    modifier = Modifier
+                        .width(180.dp)
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+                    ),
+                    singleLine = true,
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f))
+                ) { innerTextField ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (tagInput.isEmpty()) {
+                            Text(
+                                text = "为这次计时加个标签…",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.35f)
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            }
 
             // 倒计时显示 MM:SS
             val minutes = remainingSeconds / 60

@@ -320,9 +320,9 @@ class HeartRateViewModel @Inject constructor(
     /**
      * Save timer session when countdown finishes
      */
-    fun saveTimerSession(durationSeconds: Int) {
+    fun saveTimerSession(durationSeconds: Int, tag: String? = null) {
         viewModelScope.launch {
-            timerSessionRepository.saveSession(durationSeconds)
+            timerSessionRepository.saveSession(durationSeconds, tag)
         }
     }
 

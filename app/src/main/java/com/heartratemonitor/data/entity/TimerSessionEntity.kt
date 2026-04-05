@@ -13,5 +13,8 @@ data class TimerSessionEntity(
     val timestamp: Long,
 
     @ColumnInfo(name = "duration_seconds")
-    val durationSeconds: Int
+    val durationSeconds: Int,
+
+    @ColumnInfo(name = "tag")
+    val tag: String? = null
 )

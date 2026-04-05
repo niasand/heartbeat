@@ -11,11 +11,12 @@ import javax.inject.Singleton
 class TimerSessionRepository @Inject constructor(
     private val timerSessionDao: TimerSessionDao
 ) {
-    suspend fun saveSession(durationSeconds: Int) {
+    suspend fun saveSession(durationSeconds: Int, tag: String? = null) {
         timerSessionDao.insert(
             TimerSessionEntity(
                 timestamp = System.currentTimeMillis(),
-                durationSeconds = durationSeconds
+                durationSeconds = durationSeconds,
+                tag = tag?.takeIf { it.isNotBlank() }
             )
         )
     }
