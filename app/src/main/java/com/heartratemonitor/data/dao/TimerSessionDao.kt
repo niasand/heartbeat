@@ -24,6 +24,22 @@ interface TimerSessionDao {
     """)
     fun getCountByDate(): Flow<List<DateCountPair>>
 
+    @Query("""
+        SELECT DATE(timestamp / 1000, 'unixepoch', 'localtime') as date, COUNT(*) as count
+        FROM timer_sessions
+        WHERE timestamp > :afterTimestamp
+        GROUP BY date
+        ORDER BY date
+    """)
+    fun getCountByDateAfter(afterTimestamp: Long): Flow<List<DateCountPair>>
+
+    @Query("""
+        SELECT * FROM timer_sessions
+        WHERE timestamp > :afterTimestamp
+        ORDER BY timestamp DESC
+    """)
+    fun getSessionsAfter(afterTimestamp: Long): Flow<List<TimerSessionEntity>>
+
     @Query("DELETE FROM timer_sessions")
     suspend fun deleteAll()
 

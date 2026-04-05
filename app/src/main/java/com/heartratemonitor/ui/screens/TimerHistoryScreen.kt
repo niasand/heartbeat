@@ -11,8 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heartratemonitor.viewmodel.HeartRateViewModel
@@ -20,26 +20,51 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private val filterOptions = listOf(
+    "7天" to 7,
+    "30天" to 30,
+    "6个月" to 180,
+    "1年" to 365
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
-    val sessions by viewModel.timerSessionHistory.collectAsState()
-    val countByDate by viewModel.timerCountByDate.collectAsState()
+    val sessions by viewModel.filteredTimerSessions.collectAsState()
+    val countByDate by viewModel.filteredTimerCountByDate.collectAsState()
+    val currentFilter by viewModel.timerFilterDays.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Top half: bar chart
+        // Filter chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            filterOptions.forEach { (label, days) ->
+                val selected = currentFilter == days
+                FilterChip(
+                    selected = selected,
+                    onClick = { viewModel.setTimerFilterDays(days) },
+                    label = { Text(label, fontSize = 13.sp) }
+                )
+            }
+        }
+
+        // Bar chart
         TimerBarChart(
             countByDate = countByDate,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
         )
 
-        HorizontalDivider()
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-        // Bottom half: history list
+        // History list
         if (sessions.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -106,23 +131,18 @@ private fun TimerBarChart(
     modifier: Modifier = Modifier
 ) {
     if (countByDate.isEmpty()) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Box(modifier = modifier.padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
             Text("暂无数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         }
         return
     }
 
-    val recentData = countByDate.takeLast(7)
-    if (recentData.isEmpty()) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text("暂无数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-        }
-        return
-    }
-
-    val maxCount = (recentData.maxOfOrNull { it.count } ?: 1).coerceAtLeast(1)
+    val maxCount = (countByDate.maxOfOrNull { it.count } ?: 1).coerceAtLeast(1)
     val barAreaHeight = 140.dp
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+
+    // When there are too many bars, only show the last N to avoid crowding
+    val displayData = if (countByDate.size > 14) countByDate.takeLast(14) else countByDate
 
     Column(modifier = modifier) {
         Text(
@@ -132,13 +152,13 @@ private fun TimerBarChart(
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        // 柱状图 + 坐标轴
+        // Bar chart + axes
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(barAreaHeight)
         ) {
-            // 画坐标轴: Y轴(左侧竖线) + X轴(底部横线)
+            // Draw axes
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val strokeWidth = 1.dp.toPx()
                 drawLine(
@@ -157,7 +177,7 @@ private fun TimerBarChart(
                 )
             }
 
-            // 柱状图（加左内边距避开Y轴）
+            // Bars
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -166,8 +186,8 @@ private fun TimerBarChart(
                 horizontalArrangement = Arrangement.spacedBy(1.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                recentData.forEach { pair ->
-                    val barHeight = (pair.count.toFloat() / maxCount) * (barAreaHeight.value - 16) // 留空间给计数标签
+                displayData.forEach { pair ->
+                    val barHeight = (pair.count.toFloat() / maxCount) * (barAreaHeight.value - 16)
                         .coerceAtLeast(1f)
 
                     Column(
@@ -175,7 +195,6 @@ private fun TimerBarChart(
                         verticalArrangement = Arrangement.Bottom,
                         modifier = Modifier.weight(1f)
                     ) {
-                        // Count label
                         Text(
                             text = "${pair.count}次",
                             fontSize = 10.sp,
@@ -183,7 +202,6 @@ private fun TimerBarChart(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        // Bar
                         Box(
                             modifier = Modifier
                                 .width(28.dp)
@@ -202,21 +220,21 @@ private fun TimerBarChart(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // X轴日期标签
+        // X-axis date labels
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(1.dp)
         ) {
-            recentData.forEach { pair ->
+            displayData.forEach { pair ->
                 val dateLabel = pair.date.substring(5) // MM-DD
                 Text(
                     text = dateLabel,
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
             }
         }

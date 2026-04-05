@@ -114,6 +114,16 @@ class HeartRateViewModel @Inject constructor(
         emptyList()
     )
 
+    // Timer sessions filtered by time range
+    private val _timerFilterDays = MutableStateFlow(7)
+    val timerFilterDays: StateFlow<Int> = _timerFilterDays
+
+    private val _filteredTimerSessions = MutableStateFlow<List<TimerSessionEntity>>(emptyList())
+    val filteredTimerSessions: StateFlow<List<TimerSessionEntity>> = _filteredTimerSessions
+
+    private val _filteredTimerCountByDate = MutableStateFlow<List<DateCountPair>>(emptyList())
+    val filteredTimerCountByDate: StateFlow<List<DateCountPair>> = _filteredTimerCountByDate
+
     private val _syncState = MutableStateFlow<SyncState>(SyncState.IDLE)
     val syncState: StateFlow<SyncState> = _syncState
 
@@ -176,6 +186,25 @@ class HeartRateViewModel @Inject constructor(
         viewModelScope.launch {
             val sevenDaysAgo = System.currentTimeMillis() - 7 * 24 * 3600 * 1000
             _dailyStats.value = heartRateRepository.getDailyStats(sevenDaysAgo)
+        }
+
+        // Load filtered timer sessions based on selected time range
+        viewModelScope.launch {
+            _timerFilterDays.collect { days ->
+                val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
+                timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
+                    _filteredTimerSessions.value = sessions
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            _timerFilterDays.collect { days ->
+                val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
+                timerSessionRepository.getCountByDateAfter(afterTimestamp).collect { pairs ->
+                    _filteredTimerCountByDate.value = pairs
+                }
+            }
         }
     }
 
@@ -279,6 +308,13 @@ class HeartRateViewModel @Inject constructor(
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             preferencesManager.saveLowThreshold(value)
         }
+    }
+
+    /**
+     * Set timer history filter time range in days
+     */
+    fun setTimerFilterDays(days: Int) {
+        _timerFilterDays.value = days
     }
 
     /**

@@ -28,6 +28,14 @@ class TimerSessionRepository @Inject constructor(
         return timerSessionDao.getCountByDate()
     }
 
+    fun getCountByDateAfter(afterTimestamp: Long): Flow<List<DateCountPair>> {
+        return timerSessionDao.getCountByDateAfter(afterTimestamp)
+    }
+
+    fun getSessionsAfter(afterTimestamp: Long): Flow<List<TimerSessionEntity>> {
+        return timerSessionDao.getSessionsAfter(afterTimestamp)
+    }
+
     suspend fun deleteAll() {
         timerSessionDao.deleteAll()
     }
