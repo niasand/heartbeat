@@ -574,10 +574,7 @@ fun CountdownTimerCard(state: TimerState) {
                         }
                     },
                     modifier = Modifier
-                        .width(64.dp)
-                        .onFocusEvent { focusState ->
-                            if (focusState.isFocused) state.onInputMinutesChange("")
-                        },
+                        .width(64.dp),
                     singleLine = true,
                     enabled = !state.isRunning,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -598,10 +595,7 @@ fun CountdownTimerCard(state: TimerState) {
                         }
                     },
                     modifier = Modifier
-                        .width(64.dp)
-                        .onFocusEvent { focusState ->
-                            if (focusState.isFocused) state.onInputSecondsChange("")
-                        },
+                        .width(64.dp),
                     singleLine = true,
                     enabled = !state.isRunning,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
