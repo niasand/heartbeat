@@ -489,6 +489,7 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
         }
     }
 
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -574,37 +575,6 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                 )
                 Text("秒", fontSize = 14.sp)
-                var tagExpanded by remember { mutableStateOf(false) }
-                val tagOptions = listOf("平板支撑", "煮鸡蛋", "跳绳", "烧水", "冥想", "拉伸")
-                ExposedDropdownMenuBox(
-                    expanded = tagExpanded && !isRunning,
-                    onExpandedChange = { if (!isRunning) tagExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = tagInput,
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier.menuAnchor().width(100.dp),
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
-                        enabled = !isRunning,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tagExpanded) }
-                    )
-                    ExposedDropdownMenu(
-                        expanded = tagExpanded && !isRunning,
-                        onDismissRequest = { tagExpanded = false }
-                    ) {
-                        tagOptions.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option, fontSize = 14.sp) },
-                                onClick = {
-                                    tagInput = option
-                                    tagExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
                 Button(
                     onClick = { isRunning = !isRunning },
                     enabled = remainingSeconds > 0
@@ -613,5 +583,39 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
                 }
             }
         }
+    }
+
+    // 标签下拉框（Card 外部）
+    var tagExpanded by remember { mutableStateOf(false) }
+    val tagOptions = listOf("平板支撑", "煮鸡蛋", "跳绳", "烧水", "冥想", "拉伸")
+    ExposedDropdownMenuBox(
+        expanded = tagExpanded && !isRunning,
+        onExpandedChange = { if (!isRunning) tagExpanded = it }
+    ) {
+        OutlinedTextField(
+            value = tagInput,
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+            enabled = !isRunning,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tagExpanded) }
+        )
+        ExposedDropdownMenu(
+            expanded = tagExpanded && !isRunning,
+            onDismissRequest = { tagExpanded = false }
+        ) {
+            tagOptions.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option, fontSize = 14.sp) },
+                    onClick = {
+                        tagInput = option
+                        tagExpanded = false
+                    }
+                )
+            }
+        }
+    }
     }
 }
