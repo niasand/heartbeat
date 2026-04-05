@@ -140,6 +140,16 @@ class HeartRateViewModel @Inject constructor(
         data class ERROR(val message: String) : SyncState()
     }
 
+    private val _restoreState = MutableStateFlow<RestoreState>(RestoreState.IDLE)
+    val restoreState: StateFlow<RestoreState> = _restoreState
+
+    sealed class RestoreState {
+        data object IDLE : RestoreState()
+        data object RESTORING : RestoreState()
+        data class SUCCESS(val restoredHeartRates: Int, val restoredTimerSessions: Int) : RestoreState()
+        data class ERROR(val message: String) : RestoreState()
+    }
+
     sealed class ServiceState {
         data object IDLE : ServiceState()
         data object SCANNING : ServiceState()
@@ -355,6 +365,21 @@ class HeartRateViewModel @Inject constructor(
                 SyncState.SUCCESS(result.syncedHeartRates, result.syncedTimerSessions)
             } else {
                 SyncState.ERROR(result.error ?: "Sync failed")
+            }
+        }
+    }
+
+    /**
+     * Restore all data from Cloudflare D1 to local
+     */
+    fun restoreFromCloud() {
+        viewModelScope.launch {
+            _restoreState.value = RestoreState.RESTORING
+            val result = syncRepository.restoreFromCloud()
+            _restoreState.value = if (result.success) {
+                RestoreState.SUCCESS(result.restoredHeartRates, result.restoredTimerSessions)
+            } else {
+                RestoreState.ERROR(result.error ?: "Restore failed")
             }
         }
     }

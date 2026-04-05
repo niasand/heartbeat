@@ -217,8 +217,10 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
             // 数据同步卡片
             DataSyncCard(
                 syncState = syncState,
+                restoreState = viewModel.restoreState.collectAsState().value,
                 lastSyncTime = lastSyncTime,
-                onSync = { viewModel.syncToCloud() }
+                onSync = { viewModel.syncToCloud() },
+                onRestore = { viewModel.restoreFromCloud() }
             )
 
             // 提示信息
@@ -576,10 +578,13 @@ private fun RingtonePickerDialog(
 @Composable
 fun DataSyncCard(
     syncState: com.heartratemonitor.viewmodel.HeartRateViewModel.SyncState,
+    restoreState: com.heartratemonitor.viewmodel.HeartRateViewModel.RestoreState,
     lastSyncTime: Long,
-    onSync: () -> Unit
+    onSync: () -> Unit,
+    onRestore: () -> Unit
 ) {
     val isSyncing = syncState is com.heartratemonitor.viewmodel.HeartRateViewModel.SyncState.SYNCING
+    val isRestoring = restoreState is com.heartratemonitor.viewmodel.HeartRateViewModel.RestoreState.RESTORING
 
     SettingsCard(title = "数据同步") {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -608,7 +613,7 @@ fun DataSyncCard(
             // 同步按钮
             Button(
                 onClick = onSync,
-                enabled = !isSyncing,
+                enabled = !isSyncing && !isRestoring,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (isSyncing) {
@@ -621,6 +626,25 @@ fun DataSyncCard(
                     Text("同步中...")
                 } else {
                     Text("同步到云端")
+                }
+            }
+
+            // 恢复按钮
+            OutlinedButton(
+                onClick = onRestore,
+                enabled = !isSyncing && !isRestoring,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isRestoring) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("恢复中...")
+                } else {
+                    Text("从云端恢复")
                 }
             }
 
@@ -647,6 +671,38 @@ fun DataSyncCard(
                     ) {
                         Text(
                             text = "同步失败: ${syncState.message}",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFC62828)
+                        )
+                    }
+                }
+                else -> {}
+            }
+
+            // 恢复结果反馈
+            when (restoreState) {
+                is com.heartratemonitor.viewmodel.HeartRateViewModel.RestoreState.SUCCESS -> {
+                    val state = restoreState
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFE8F5E9)
+                    ) {
+                        Text(
+                            text = "恢复成功！心率 ${state.restoredHeartRates} 条，计时 ${state.restoredTimerSessions} 条",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
+                }
+                is com.heartratemonitor.viewmodel.HeartRateViewModel.RestoreState.ERROR -> {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFFEBEE)
+                    ) {
+                        Text(
+                            text = "恢复失败: ${restoreState.message}",
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFFC62828)

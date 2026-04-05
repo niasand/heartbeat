@@ -15,7 +15,8 @@ data class HeartRateRecord(
 
 data class TimerSessionRecord(
     val timestamp: Long,
-    val durationSeconds: Int
+    val durationSeconds: Int,
+    val tag: String? = null
 )
 
 /**
@@ -35,5 +36,36 @@ data class SyncResult(
     val success: Boolean,
     val syncedHeartRates: Int = 0,
     val syncedTimerSessions: Int = 0,
+    val error: String? = null
+)
+
+/**
+ * Response from GET / fetch endpoint for restore
+ */
+data class FetchResponse(
+    val success: Boolean,
+    val heartRates: List<FetchedHeartRate> = emptyList(),
+    val timerSessions: List<FetchedTimerSession> = emptyList(),
+    val message: String? = null
+)
+
+data class FetchedHeartRate(
+    val timestamp: Long,
+    val heart_rate: Int
+)
+
+data class FetchedTimerSession(
+    val timestamp: Long,
+    val duration_seconds: Int,
+    val tag: String? = null
+)
+
+/**
+ * Restore result for UI layer
+ */
+data class RestoreResult(
+    val success: Boolean,
+    val restoredHeartRates: Int = 0,
+    val restoredTimerSessions: Int = 0,
     val error: String? = null
 )

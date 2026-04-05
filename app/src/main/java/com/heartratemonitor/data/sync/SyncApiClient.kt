@@ -58,4 +58,33 @@ class SyncApiClient @Inject constructor() {
             )
         }
     }
+
+    /**
+     * Fetch all data from Cloudflare Workers for restore
+     */
+    suspend fun fetchData(): FetchResponse = withContext(Dispatchers.IO) {
+        val httpRequest = Request.Builder()
+            .url(ApiConfig.SYNC_API_URL)
+            .get()
+            .build()
+
+        try {
+            val response = httpClient.newCall(httpRequest).execute()
+            val responseBody = response.body?.string()
+
+            if (response.isSuccessful && responseBody != null) {
+                gson.fromJson(responseBody, FetchResponse::class.java)
+            } else {
+                FetchResponse(
+                    success = false,
+                    message = "HTTP ${response.code}: ${responseBody ?: "empty response"}"
+                )
+            }
+        } catch (e: Exception) {
+            FetchResponse(
+                success = false,
+                message = e.message ?: "Network error"
+            )
+        }
+    }
 }

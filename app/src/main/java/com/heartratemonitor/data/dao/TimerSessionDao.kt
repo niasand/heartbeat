@@ -13,6 +13,9 @@ interface TimerSessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(session: TimerSessionEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(sessions: List<TimerSessionEntity>)
+
     @Query("SELECT * FROM timer_sessions ORDER BY timestamp DESC")
     fun getAllSessions(): Flow<List<TimerSessionEntity>>
 

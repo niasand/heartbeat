@@ -2,6 +2,8 @@ package com.heartratemonitor.data.sync
 
 import com.heartratemonitor.data.dao.HeartRateDao
 import com.heartratemonitor.data.dao.TimerSessionDao
+import com.heartratemonitor.data.entity.HeartRateEntity
+import com.heartratemonitor.data.entity.TimerSessionEntity
 import com.heartratemonitor.data.pref.PreferencesManager
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -55,6 +57,41 @@ class SyncRepository @Inject constructor(
             syncedHeartRates = response.syncedHeartRates,
             syncedTimerSessions = response.syncedTimerSessions,
             error = response.message
+        )
+    }
+
+    /**
+     * Fetch all data from cloud and restore to local database.
+     * Existing local data is preserved (REPLACE on conflict).
+     */
+    suspend fun restoreFromCloud(): RestoreResult {
+        val response = syncApiClient.fetchData()
+
+        if (!response.success) {
+            return RestoreResult(
+                success = false,
+                error = response.message ?: "Fetch failed"
+            )
+        }
+
+        val hrEntities = response.heartRates.map {
+            HeartRateEntity(timestamp = it.timestamp, heartRate = it.heart_rate)
+        }
+        if (hrEntities.isNotEmpty()) {
+            heartRateDao.insertAll(hrEntities)
+        }
+
+        val tsEntities = response.timerSessions.map {
+            TimerSessionEntity(timestamp = it.timestamp, durationSeconds = it.duration_seconds, tag = it.tag)
+        }
+        if (tsEntities.isNotEmpty()) {
+            timerSessionDao.insertAll(tsEntities)
+        }
+
+        return RestoreResult(
+            success = true,
+            restoredHeartRates = hrEntities.size,
+            restoredTimerSessions = tsEntities.size
         )
     }
 }
