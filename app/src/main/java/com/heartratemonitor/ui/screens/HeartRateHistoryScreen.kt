@@ -38,7 +38,6 @@ import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-import com.patrykandpatrick.vico.compose.chart.scroll.rememberChartScrollState
 import com.patrykandpatrick.vico.core.marker.Marker
 import com.patrykandpatrick.vico.compose.component.shapeComponent
 import com.patrykandpatrick.vico.compose.component.textComponent
@@ -162,21 +161,21 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
     var showDailyStats by remember { mutableStateOf(false) }
 
-    // 准备图表数据 (显示过去180分钟的心率数据)
+    // 准备图表数据 (显示过去2小时的心率数据)
     val chartData: Any = remember(allHeartRateHistory) {
         if (allHeartRateHistory.isEmpty()) {
             Triple(emptyList<FloatEntry>(), 0L, 0)
         } else {
-            // 显示过去180分钟的数据
-            val windowStart = System.currentTimeMillis() - 180 * 60 * 1000
+            // 固定显示过去2小时的数据
+            val windowStart = System.currentTimeMillis() - 120 * 60 * 1000
             val recentData = allHeartRateHistory.filter { it.timestamp >= windowStart }
             if (recentData.isEmpty()) {
                 Triple(emptyList<FloatEntry>(), 0L, 0)
             } else {
-                val earliestTimestamp = recentData.minOf { it.timestamp }
+                val earliestTimestamp = windowStart
                 val latestTimestamp = System.currentTimeMillis()
-                val actualMinutes = ((latestTimestamp - earliestTimestamp) / 60000).toInt()
-                
+                val actualMinutes = 120 // 固定2小时
+
                 val interval = 60 * 1000L // 每1分钟一个点
                 val groupedData = recentData.groupBy { (it.timestamp / interval) * interval }
                 val baseTime = earliestTimestamp
@@ -190,18 +189,16 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
     }
     
-    // Extract chart data, base time and actual time span
+    // Extract chart data and base time
     val entries = if (chartData is Triple<*, *, *>) (chartData as Triple<List<FloatEntry>, Long, Int>).first else emptyList<FloatEntry>()
     val baseTime = if (chartData is Triple<*, *, *>) (chartData as Triple<List<FloatEntry>, Long, Int>).second else 0L
-    val actualMinutes = if (chartData is Triple<*, *, *>) (chartData as Triple<List<FloatEntry>, Long, Int>).third else 0
 
-    // X轴格式化器 (根据实际数据时间范围动态显示刻度)
-    val xAxisFormatter = remember(baseTime, actualMinutes) {
+    // X轴格式化器 (固定2小时，每30分钟一个刻度)
+    val xAxisFormatter = remember(baseTime) {
         AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
             try {
                 val minutes = value.toInt()
-                // 只显示不超过实际数据时间的刻度，且每30分钟一个刻度
-                if (minutes % 30 == 0 && minutes <= actualMinutes) {
+                if (minutes % 30 == 0 && minutes >= 0 && minutes <= 120) {
                     minutes.toString()
                 } else {
                     ""
@@ -211,27 +208,11 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
             }
         }
     }
-    
-    // 计算X轴最大值（基于实际数据时间范围，向上取整到最近的30分钟）
-    val maxXValue = remember(actualMinutes) {
-        if (actualMinutes <= 0) {
-            180f // 180分钟
-        } else {
-            ((actualMinutes / 30 + 1) * 30).toFloat()
-        }
-    }
 
-    // 计算X轴最小值，显示最近60分钟的数据（自动滚动效果）
-    // 如果数据少于60分钟，则显示所有数据
-    val visibleWindowMinutes = 60f // 可视窗口显示60分钟
-    val minXValue = remember(maxXValue, actualMinutes) {
-        if (actualMinutes <= visibleWindowMinutes) {
-            0f // 数据少于60分钟，从0开始显示
-        } else {
-            maxXValue - visibleWindowMinutes // 显示最后60分钟的数据
-        }
-    }
-    
+    // X轴固定0-120分钟
+    val maxXValue = 120f
+    val minXValue = 0f
+
     // 时间范围显示
     val timeRangeText = remember(baseTime) {
         if (baseTime > 0) {
@@ -243,15 +224,9 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
             ""
         }
     }
-    
-    // 动态标题
-    val chartTitle = remember(actualMinutes) {
-        when {
-            actualMinutes <= 0 -> "心率趋势"
-            actualMinutes <= 30 -> "过去${actualMinutes}分钟心率趋势"
-            else -> "过去${actualMinutes}分钟心率趋势"
-        }
-    }
+
+    // 固定标题
+    val chartTitle = "过去2小时心率趋势"
 
     // Handle empty data case for stats
     val displayStats = heartRateStats ?: HeartRateViewModel.HeartRateStats(0.0, 0, 0, 0)
@@ -348,8 +323,6 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
                         val chartEntryModel = entryModelOf(entries)
                         val marker = rememberMarker()
-                        val chartScrollState = rememberChartScrollState()
-
                         Chart(
                             chart = lineChart(
                                 spacing = 2.dp,
@@ -385,7 +358,6 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                                 guideline = null
                             ),
                             marker = marker,
-                            chartScrollState = chartScrollState,
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
