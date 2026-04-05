@@ -161,30 +161,41 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
     var showDailyStats by remember { mutableStateOf(false) }
 
-    // 准备图表数据 (显示过去2小时的心率数据)
-    val chartData: Any = remember(allHeartRateHistory) {
+    // 每分钟 tick 一次，确保图表窗口始终跟随当前时间
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000L)
+            tick++
+        }
+    }
+
+    // 准备图表数据 (从数据库取最近3小时，图表展示最新2小时)
+    val chartData: Any = remember(allHeartRateHistory, tick) {
         if (allHeartRateHistory.isEmpty()) {
             Triple(emptyList<FloatEntry>(), 0L, 0)
         } else {
-            // 固定显示过去2小时的数据
-            val windowStart = System.currentTimeMillis() - 120 * 60 * 1000
-            val recentData = allHeartRateHistory.filter { it.timestamp >= windowStart }
+            // 从数据库取最近3小时的数据
+            val fetchWindow = 180 * 60 * 1000L
+            val threeHoursAgo = System.currentTimeMillis() - fetchWindow
+            val recentData = allHeartRateHistory.filter { it.timestamp >= threeHoursAgo }
             if (recentData.isEmpty()) {
                 Triple(emptyList<FloatEntry>(), 0L, 0)
             } else {
-                val earliestTimestamp = windowStart
-                val latestTimestamp = System.currentTimeMillis()
-                val actualMinutes = 120 // 固定2小时
+                // 图表只展示最新2小时
+                val chartWindowStart = System.currentTimeMillis() - 120 * 60 * 1000
+                val chartData = recentData.filter { it.timestamp >= chartWindowStart }
+
+                val baseTime = chartWindowStart
 
                 val interval = 60 * 1000L // 每1分钟一个点
-                val groupedData = recentData.groupBy { (it.timestamp / interval) * interval }
-                val baseTime = earliestTimestamp
+                val groupedData = chartData.groupBy { (it.timestamp / interval) * interval }
                 val data = groupedData.map { (timestamp, entities) ->
                     val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
                     val xValue = ((timestamp - baseTime) / 60000f) // Convert to minutes
                     FloatEntry(xValue, maxHeartRate)
                 }.sortedBy { it.x }
-                Triple(data, baseTime, actualMinutes)
+                Triple(data, baseTime, 120)
             }
         }
     }
@@ -213,8 +224,8 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     val maxXValue = 120f
     val minXValue = 0f
 
-    // 时间范围显示
-    val timeRangeText = remember(baseTime) {
+    // 时间范围显示（随 tick 更新 endTime）
+    val timeRangeText = remember(baseTime, tick) {
         if (baseTime > 0) {
             val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
             val startTime = sdf.format(baseTime)
