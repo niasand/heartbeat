@@ -115,6 +115,11 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
             timerHasPlayed = true
             Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
             viewModel.saveTimerSession(timerTotalSeconds, timerTagInput.ifBlank { null })
+            // 恢复输入框和倒计时到初始状态
+            timerInputMinutes = "0"
+            timerInputSeconds = "40"
+            timerTotalSeconds = 40
+            timerRemainingSeconds = 40
             try {
                 mediaPlayer.reset()
                 val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
