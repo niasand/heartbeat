@@ -156,7 +156,6 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
                                 onClick = { },
                                 onLongClick = {
                                     viewModel.deleteTimerSession(session.timestamp)
-                                    Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
                                 }
                             ),
                         verticalAlignment = Alignment.CenterVertically
