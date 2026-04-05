@@ -171,15 +171,15 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     }
 
     // 准备图表数据 (从数据库取最近3小时，图表展示最新2小时)
-    // 只在数据变化时重新过滤，不受 tick 驱动，避免全量历史扫描
-    val chartData: Any = remember(allHeartRateHistory) {
-        if (allHeartRateHistory.isEmpty()) {
+    // tick 驱动时间窗口平移；使用 recentHeartRateHistory (已限制600条) 避免全量历史扫描
+    val chartData: Any = remember(recentHeartRateHistory, tick) {
+        if (recentHeartRateHistory.isEmpty()) {
             Triple(emptyList<FloatEntry>(), 0L, 0)
         } else {
             // 从数据库取最近3小时的数据
             val fetchWindow = 180 * 60 * 1000L
             val threeHoursAgo = System.currentTimeMillis() - fetchWindow
-            val recentData = allHeartRateHistory.filter { it.timestamp >= threeHoursAgo }
+            val recentData = recentHeartRateHistory.filter { it.timestamp >= threeHoursAgo }
             if (recentData.isEmpty()) {
                 Triple(emptyList<FloatEntry>(), 0L, 0)
             } else {
