@@ -10,6 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
@@ -36,6 +39,7 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
     val sessions by viewModel.filteredTimerSessions.collectAsState()
     val countByDate by viewModel.filteredTimerCountByDate.collectAsState()
     val currentFilter by viewModel.timerFilterDays.collectAsState()
+    val currentTagFilter by viewModel.timerFilterTag.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -71,6 +75,8 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
         // Table header
+        val availableTags = sessions.mapNotNull { it.tag }.distinct()
+        var tagMenuExpanded by remember { mutableStateOf(false) }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -78,7 +84,36 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("日期", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f))
-            Text("计时类型", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Text(
+                    text = if (currentTagFilter.isNullOrBlank()) "计时类型" else "计时类型($currentTagFilter)",
+                    fontSize = 12.sp,
+                    fontWeight = if (currentTagFilter != null) FontWeight.Bold else FontWeight.Normal,
+                    color = if (currentTagFilter != null) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.clickable { tagMenuExpanded = true }
+                )
+                DropdownMenu(
+                    expanded = tagMenuExpanded,
+                    onDismissRequest = { tagMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("全部", fontSize = 14.sp) },
+                        onClick = {
+                            viewModel.setTimerFilterTag(null)
+                            tagMenuExpanded = false
+                        }
+                    )
+                    availableTags.forEach { tag ->
+                        DropdownMenuItem(
+                            text = { Text(tag, fontSize = 14.sp) },
+                            onClick = {
+                                viewModel.setTimerFilterTag(tag)
+                                tagMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
             Text("计时时间", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f), textAlign = TextAlign.End)
         }
 

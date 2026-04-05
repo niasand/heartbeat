@@ -13,6 +13,7 @@ import com.heartratemonitor.data.dao.DateCountPair
 import com.heartratemonitor.data.dao.DailyHeartRateStats
 import com.heartratemonitor.ble.BleConnectionManager
 import com.heartratemonitor.ble.BleScanner
+import kotlinx.coroutines.flow.combine
 import com.heartratemonitor.ble.DeviceInfo
 import com.heartratemonitor.ble.ConnectionState
 import com.heartratemonitor.ble.AutoReconnectState
@@ -118,6 +119,10 @@ class HeartRateViewModel @Inject constructor(
     private val _timerFilterDays = MutableStateFlow(7)
     val timerFilterDays: StateFlow<Int> = _timerFilterDays
 
+    // Timer sessions filtered by tag (null = show all)
+    private val _timerFilterTag = MutableStateFlow<String?>(null)
+    val timerFilterTag: StateFlow<String?> = _timerFilterTag
+
     private val _filteredTimerSessions = MutableStateFlow<List<TimerSessionEntity>>(emptyList())
     val filteredTimerSessions: StateFlow<List<TimerSessionEntity>> = _filteredTimerSessions
 
@@ -198,12 +203,15 @@ class HeartRateViewModel @Inject constructor(
             _dailyStats.value = heartRateRepository.getDailyStats(sevenDaysAgo)
         }
 
-        // Load filtered timer sessions based on selected time range
+        // Load filtered timer sessions based on selected time range and tag
         viewModelScope.launch {
-            _timerFilterDays.collect { days ->
+            combine(_timerFilterDays, _timerFilterTag) { days, tag ->
+                Pair(days, tag)
+            }.collect { (days, tag) ->
                 val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
                 timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
-                    _filteredTimerSessions.value = sessions
+                    _filteredTimerSessions.value = if (tag.isNullOrBlank()) sessions
+                        else sessions.filter { it.tag == tag }
                 }
             }
         }
@@ -325,6 +333,10 @@ class HeartRateViewModel @Inject constructor(
      */
     fun setTimerFilterDays(days: Int) {
         _timerFilterDays.value = days
+    }
+
+    fun setTimerFilterTag(tag: String?) {
+        _timerFilterTag.value = tag
     }
 
     /**
