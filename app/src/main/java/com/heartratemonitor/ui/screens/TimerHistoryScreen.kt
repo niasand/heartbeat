@@ -1,6 +1,7 @@
 package com.heartratemonitor.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.heartratemonitor.ui.theme.AppColors
 import com.heartratemonitor.viewmodel.HeartRateViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -37,19 +39,22 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Filter chips
+        // Filter tabs
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             filterOptions.forEach { (label, days) ->
                 val selected = currentFilter == days
-                FilterChip(
-                    selected = selected,
-                    onClick = { viewModel.setTimerFilterDays(days) },
-                    label = { Text(label, fontSize = 13.sp) }
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (selected) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { viewModel.setTimerFilterDays(days) }
                 )
             }
         }
