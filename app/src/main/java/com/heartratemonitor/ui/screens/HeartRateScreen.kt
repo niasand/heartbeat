@@ -70,10 +70,76 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
     var connectAttemptId by remember { mutableIntStateOf(0) }
-    
+
     // 自动连接状态提升到父组件，避免Tab切换时重复触发
     var hasAutoConnectAttempted by remember { mutableStateOf(false) }
     var hasAutoConnectedDevice by remember { mutableStateOf(false) }
+
+    // 倒计时状态提升到此处，避免切换Tab时状态丢失
+    var timerTotalSeconds by remember { mutableIntStateOf(40) }
+    var timerRemainingSeconds by remember { mutableIntStateOf(40) }
+    var timerIsRunning by remember { mutableStateOf(false) }
+    var timerInputMinutes by remember { mutableStateOf("0") }
+    var timerInputSeconds by remember { mutableStateOf("40") }
+    var timerTagInput by remember { mutableStateOf("平板支撑") }
+    var timerHasPlayed by remember { mutableStateOf(false) }
+
+    // 读取铃声偏好
+    val preferencesManager = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            PreferencesEntryPoint::class.java
+        ).preferencesManager()
+    }
+    var timerSoundUri by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        preferencesManager.timerSoundUriFlow.collect { uri -> timerSoundUri = uri }
+    }
+
+    // MediaPlayer 持久持有，防止 GC 回收
+    val mediaPlayer = remember { android.media.MediaPlayer() }
+
+    // 倒计时逻辑（在 Tab 切换时继续运行）
+    LaunchedEffect(timerIsRunning, timerRemainingSeconds) {
+        if (timerIsRunning && timerRemainingSeconds > 0) {
+            delay(1000L)
+            timerRemainingSeconds--
+        } else if (timerRemainingSeconds == 0) {
+            timerIsRunning = false
+        }
+    }
+
+    // 倒计时结束：播放铃声 + Toast + 保存记录
+    LaunchedEffect(timerRemainingSeconds, timerIsRunning) {
+        if (timerRemainingSeconds == 0 && !timerIsRunning && !timerHasPlayed) {
+            timerHasPlayed = true
+            Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
+            viewModel.saveTimerSession(timerTotalSeconds, timerTagInput.ifBlank { null })
+            try {
+                mediaPlayer.reset()
+                val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
+                    else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                mediaPlayer.setDataSource(context, uri)
+                mediaPlayer.setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                mediaPlayer.prepare()
+                mediaPlayer.start()
+            } catch (_: Exception) {}
+        }
+        if (timerRemainingSeconds > 0) {
+            timerHasPlayed = false
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try { mediaPlayer.release() } catch (_: Exception) {}
+        }
+    }
 
     // Start scanning when the screen is first shown? Maybe not, better on button click.
     
@@ -130,13 +196,27 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
         ) {
             when (selectedTab) {
                 0 -> RealTimeHeartRateScreen(
-                    viewModel, 
-                    connectAttemptId, 
+                    viewModel,
+                    connectAttemptId,
                     { connectAttemptId = it },
                     hasAutoConnectAttempted,
                     { hasAutoConnectAttempted = it },
                     hasAutoConnectedDevice,
-                    { hasAutoConnectedDevice = it }
+                    { hasAutoConnectedDevice = it },
+                    TimerState(
+                        totalSeconds = timerTotalSeconds,
+                        remainingSeconds = timerRemainingSeconds,
+                        isRunning = timerIsRunning,
+                        inputMinutes = timerInputMinutes,
+                        inputSeconds = timerInputSeconds,
+                        tagInput = timerTagInput,
+                        onTotalSecondsChange = { timerTotalSeconds = it },
+                        onRemainingSecondsChange = { timerRemainingSeconds = it },
+                        onIsRunningChange = { timerIsRunning = it },
+                        onInputMinutesChange = { timerInputMinutes = it },
+                        onInputSecondsChange = { timerInputSeconds = it },
+                        onTagInputChange = { timerTagInput = it }
+                    )
                 )
                 1 -> HeartRateHistoryScreen(viewModel)
                 2 -> TimerHistoryScreen(viewModel)
@@ -146,18 +226,37 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
 }
 
 /**
+ * 倒计时状态（提升到 HeartRateScreen 以支持 Tab 切换后保持状态）
+ */
+data class TimerState(
+    val totalSeconds: Int,
+    val remainingSeconds: Int,
+    val isRunning: Boolean,
+    val inputMinutes: String,
+    val inputSeconds: String,
+    val tagInput: String,
+    val onTotalSecondsChange: (Int) -> Unit,
+    val onRemainingSecondsChange: (Int) -> Unit,
+    val onIsRunningChange: (Boolean) -> Unit,
+    val onInputMinutesChange: (String) -> Unit,
+    val onInputSecondsChange: (String) -> Unit,
+    val onTagInputChange: (String) -> Unit
+)
+
+/**
  * 实时心率屏幕
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun RealTimeHeartRateScreen(
-    viewModel: HeartRateViewModel = viewModel(), 
-    connectAttemptId: Int, 
+    viewModel: HeartRateViewModel = viewModel(),
+    connectAttemptId: Int,
     onConnectAttemptIdChange: (Int) -> Unit = {},
     hasAutoConnectAttempted: Boolean,
     onHasAutoConnectAttemptedChange: (Boolean) -> Unit,
     hasAutoConnectedDevice: Boolean,
-    onHasAutoConnectedDeviceChange: (Boolean) -> Unit
+    onHasAutoConnectedDeviceChange: (Boolean) -> Unit,
+    timerState: TimerState
 ) {
     val context = LocalContext.current
     val currentHeartRate by viewModel.currentHeartRate.collectAsState()
@@ -378,7 +477,7 @@ fun RealTimeHeartRateScreen(
         }
 
         // 倒计时
-        CountdownTimerCard(viewModel)
+        CountdownTimerCard(timerState)
     }
 
     // 设备选择对话框
@@ -422,74 +521,7 @@ fun RealTimeHeartRateScreen(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CountdownTimerCard(viewModel: HeartRateViewModel) {
-    var totalSeconds by remember { mutableIntStateOf(40) }
-    var remainingSeconds by remember { mutableIntStateOf(40) }
-    var isRunning by remember { mutableStateOf(false) }
-    var inputMinutes by remember { mutableStateOf("0") }
-    var inputSeconds by remember { mutableStateOf("40") }
-    var tagInput by remember { mutableStateOf("平板支撑") }
-
-    val context = LocalContext.current
-
-    // 读取铃声偏好
-    val preferencesManager = remember {
-        EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            PreferencesEntryPoint::class.java
-        ).preferencesManager()
-    }
-    var timerSoundUri by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        preferencesManager.timerSoundUriFlow.collect { uri -> timerSoundUri = uri }
-    }
-
-    // MediaPlayer 持久持有，防止 GC 回收
-    val mediaPlayer = remember { android.media.MediaPlayer() }
-
-    // 倒计时逻辑
-    LaunchedEffect(isRunning, remainingSeconds) {
-        if (isRunning && remainingSeconds > 0) {
-            delay(1000L)
-            remainingSeconds--
-        } else if (remainingSeconds == 0) {
-            isRunning = false
-        }
-    }
-
-    // 倒计时结束：播放铃声 + Toast
-    var hasPlayed by remember { mutableStateOf(false) }
-    LaunchedEffect(remainingSeconds, isRunning) {
-        if (remainingSeconds == 0 && !isRunning && !hasPlayed) {
-            hasPlayed = true
-            Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
-            viewModel.saveTimerSession(totalSeconds, tagInput.ifBlank { null })
-            try {
-                mediaPlayer.reset()
-                val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
-                    else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                mediaPlayer.setDataSource(context, uri)
-                mediaPlayer.setAudioAttributes(
-                    android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                mediaPlayer.prepare()
-                mediaPlayer.start()
-            } catch (_: Exception) {}
-        }
-        if (remainingSeconds > 0) {
-            hasPlayed = false
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            try { mediaPlayer.release() } catch (_: Exception) {}
-        }
-    }
-
+fun CountdownTimerCard(state: TimerState) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -513,74 +545,74 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
             )
 
             // 倒计时显示 MM:SS
-            val minutes = remainingSeconds / 60
-            val seconds = remainingSeconds % 60
+            val minutes = state.remainingSeconds / 60
+            val seconds = state.remainingSeconds % 60
             Text(
                 text = "%02d:%02d".format(minutes, seconds),
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (remainingSeconds == 0) AppColors.HeartRateCritical
+                color = if (state.remainingSeconds == 0) AppColors.HeartRateCritical
                     else MaterialTheme.colorScheme.onSecondaryContainer
             )
 
-            // 输入框在左，标签在右，开始按钮最后
+            // 输入框在左，开始按钮最后
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 OutlinedTextField(
-                    value = inputMinutes,
+                    value = state.inputMinutes,
                     onValueChange = { text ->
                         if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..999 } == true)) {
-                            inputMinutes = text
-                            if (!isRunning) {
+                            state.onInputMinutesChange(text)
+                            if (!state.isRunning) {
                                 val mins = text.toIntOrNull() ?: 0
-                                val secs = inputSeconds.toIntOrNull() ?: 0
+                                val secs = state.inputSeconds.toIntOrNull() ?: 0
                                 val total = mins * 60 + secs
-                                if (total > 0) { totalSeconds = total; remainingSeconds = total }
+                                if (total > 0) { state.onTotalSecondsChange(total); state.onRemainingSecondsChange(total) }
                             }
                         }
                     },
                     modifier = Modifier
                         .width(64.dp)
-                        .onFocusEvent { state ->
-                            if (state.isFocused) inputMinutes = ""
+                        .onFocusEvent { focusState ->
+                            if (focusState.isFocused) state.onInputMinutesChange("")
                         },
                     singleLine = true,
-                    enabled = !isRunning,
+                    enabled = !state.isRunning,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                 )
                 Text("分", fontSize = 14.sp)
                 OutlinedTextField(
-                    value = inputSeconds,
+                    value = state.inputSeconds,
                     onValueChange = { text ->
                         if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..59 } == true)) {
-                            inputSeconds = text
-                            if (!isRunning) {
-                                val mins = inputMinutes.toIntOrNull() ?: 0
+                            state.onInputSecondsChange(text)
+                            if (!state.isRunning) {
+                                val mins = state.inputMinutes.toIntOrNull() ?: 0
                                 val secs = text.toIntOrNull() ?: 0
                                 val total = mins * 60 + secs
-                                if (total > 0) { totalSeconds = total; remainingSeconds = total }
+                                if (total > 0) { state.onTotalSecondsChange(total); state.onRemainingSecondsChange(total) }
                             }
                         }
                     },
                     modifier = Modifier
                         .width(64.dp)
-                        .onFocusEvent { state ->
-                            if (state.isFocused) inputSeconds = ""
+                        .onFocusEvent { focusState ->
+                            if (focusState.isFocused) state.onInputSecondsChange("")
                         },
                     singleLine = true,
-                    enabled = !isRunning,
+                    enabled = !state.isRunning,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                 )
                 Text("秒", fontSize = 14.sp)
                 Button(
-                    onClick = { isRunning = !isRunning },
-                    enabled = remainingSeconds > 0
+                    onClick = { state.onIsRunningChange(!state.isRunning) },
+                    enabled = state.remainingSeconds > 0
                 ) {
-                    Text(if (isRunning) "暂停" else "开始")
+                    Text(if (state.isRunning) "暂停" else "开始")
                 }
             }
         }
@@ -590,28 +622,28 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
     var tagExpanded by remember { mutableStateOf(false) }
     val tagOptions = listOf("平板支撑", "煮鸡蛋", "跳绳", "烧水", "冥想", "拉伸")
     ExposedDropdownMenuBox(
-        expanded = tagExpanded && !isRunning,
-        onExpandedChange = { if (!isRunning) tagExpanded = it }
+        expanded = tagExpanded && !state.isRunning,
+        onExpandedChange = { if (!state.isRunning) tagExpanded = it }
     ) {
         OutlinedTextField(
-            value = tagInput,
+            value = state.tagInput,
             onValueChange = {},
             readOnly = true,
             modifier = Modifier.menuAnchor().fillMaxWidth(),
             singleLine = true,
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, textAlign = TextAlign.Center),
-            enabled = !isRunning,
+            enabled = !state.isRunning,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tagExpanded) }
         )
         ExposedDropdownMenu(
-            expanded = tagExpanded && !isRunning,
+            expanded = tagExpanded && !state.isRunning,
             onDismissRequest = { tagExpanded = false }
         ) {
             tagOptions.forEach { option ->
                 DropdownMenuItem(
                     text = { Text(option, fontSize = 14.sp) },
                     onClick = {
-                        tagInput = option
+                        state.onTagInputChange(option)
                         tagExpanded = false
                     }
                 )
