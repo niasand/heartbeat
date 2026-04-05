@@ -26,6 +26,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private var service: BleHeartRateService? = null
+    private var isBound = false
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             service = (binder as BleHeartRateService.LocalBinder).getService()
@@ -46,13 +47,20 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         val intent = Intent(this, BleHeartRateService::class.java)
-        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        isBound = bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
     override fun onStop() {
         super.onStop()
-        service = null
-        unbindService(serviceConnection)
+        if (isBound) {
+            try {
+                unbindService(serviceConnection)
+            } catch (e: IllegalArgumentException) {
+                // Service was already destroyed by the system
+            }
+            isBound = false
+            service = null
+        }
     }
 }
 
