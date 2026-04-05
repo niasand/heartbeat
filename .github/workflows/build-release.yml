@@ -23,7 +23,13 @@ jobs:
       - name: Create keystore
         shell: bash
         run: |
-          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\n\r ' | base64 -d > app/release.keystore
+          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
+
+      - name: Verify keystore
+        run: |
+          keytool -list -keystore app/release.keystore \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -alias "${{ secrets.KEY_ALIAS }}" 2>&1
 
       - name: Build Release APK
         env:
