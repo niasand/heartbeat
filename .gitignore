@@ -101,6 +101,3 @@ lint-results*.xml
 .DS_Store
 Thumbs.db
 .gstack/
-
-# API config (contains hardcoded URLs/secrets)
-**/data/sync/ApiConfig.kt
