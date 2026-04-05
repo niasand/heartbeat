@@ -510,44 +510,6 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
             )
 
-            // 标签输入
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.06f),
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
-                )
-            ) {
-                BasicTextField(
-                    value = tagInput,
-                    onValueChange = { tagInput = it },
-                    modifier = Modifier
-                        .width(180.dp)
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
-                    ),
-                    singleLine = true,
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f))
-                ) { innerTextField ->
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (tagInput.isEmpty()) {
-                            Text(
-                                text = "为这次计时加个标签…",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.35f)
-                            )
-                        }
-                        innerTextField()
-                    }
-                }
-            }
-
             // 倒计时显示 MM:SS
             val minutes = remainingSeconds / 60
             val seconds = remainingSeconds % 60
@@ -612,6 +574,15 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                 )
                 Text("秒", fontSize = 14.sp)
+                OutlinedTextField(
+                    value = tagInput,
+                    onValueChange = { tagInput = it },
+                    modifier = Modifier.width(100.dp),
+                    singleLine = true,
+                    placeholder = { Text("标签", fontSize = 14.sp) },
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                    enabled = !isRunning
+                )
                 Button(
                     onClick = { isRunning = !isRunning },
                     enabled = remainingSeconds > 0
