@@ -532,7 +532,10 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
                     singleLine = true,
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f))
                 ) { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (tagInput.isEmpty()) {
                             Text(
                                 text = "为这次计时加个标签…",
