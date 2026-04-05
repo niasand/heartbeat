@@ -427,7 +427,7 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
     var isRunning by remember { mutableStateOf(false) }
     var inputMinutes by remember { mutableStateOf("0") }
     var inputSeconds by remember { mutableStateOf("40") }
-    var tagInput by remember { mutableStateOf("") }
+    var tagInput by remember { mutableStateOf("平板支撑") }
 
     val context = LocalContext.current
 
