@@ -598,7 +598,7 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
             readOnly = true,
             modifier = Modifier.menuAnchor().fillMaxWidth(),
             singleLine = true,
-            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, textAlign = TextAlign.Center),
             enabled = !isRunning,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tagExpanded) }
         )
