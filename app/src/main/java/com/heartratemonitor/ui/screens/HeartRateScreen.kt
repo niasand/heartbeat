@@ -164,15 +164,18 @@ fun RealTimeHeartRateScreen(
     val autoReconnectState by viewModel.autoReconnectState.collectAsState()
     val lastDeviceAddress by viewModel.lastDeviceAddress.collectAsState()
 
-    // 权限状态
+    // 权限状态（Android 13+ 需要 POST_NOTIFICATIONS 才能显示前台服务通知）
     val permissionsState = rememberMultiplePermissionsState(
-        permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT
-            )
-        } else {
-            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        permissions = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(Manifest.permission.BLUETOOTH_SCAN)
+                add(Manifest.permission.BLUETOOTH_CONNECT)
+            } else {
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
         }
     )
 
