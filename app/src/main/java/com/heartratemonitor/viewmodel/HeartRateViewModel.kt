@@ -13,6 +13,7 @@ import com.heartratemonitor.data.dao.DateCountPair
 import com.heartratemonitor.data.dao.DailyHeartRateStats
 import com.heartratemonitor.ble.BleConnectionManager
 import com.heartratemonitor.ble.BleScanner
+import kotlinx.coroutines.flow.combine
 import com.heartratemonitor.ble.DeviceInfo
 import com.heartratemonitor.ble.ConnectionState
 import com.heartratemonitor.ble.AutoReconnectState
@@ -118,11 +119,34 @@ class HeartRateViewModel @Inject constructor(
     private val _timerFilterDays = MutableStateFlow(7)
     val timerFilterDays: StateFlow<Int> = _timerFilterDays
 
-    private val _filteredTimerSessions = MutableStateFlow<List<TimerSessionEntity>>(emptyList())
-    val filteredTimerSessions: StateFlow<List<TimerSessionEntity>> = _filteredTimerSessions
+    // Timer sessions filtered by tag (null = show all)
+    private val _timerFilterTag = MutableStateFlow<String?>(null)
+    val timerFilterTag: StateFlow<String?> = _timerFilterTag
 
-    private val _filteredTimerCountByDate = MutableStateFlow<List<DateCountPair>>(emptyList())
-    val filteredTimerCountByDate: StateFlow<List<DateCountPair>> = _filteredTimerCountByDate
+    // Time-range filtered sessions (before tag filter)
+    private val _sessionsInTimeRange = MutableStateFlow<List<TimerSessionEntity>>(emptyList())
+    val sessionsInTimeRange: StateFlow<List<TimerSessionEntity>> = _sessionsInTimeRange
+
+    // Final filtered sessions = time range filter + tag filter
+    val filteredTimerSessions: StateFlow<List<TimerSessionEntity>> = combine(
+        _sessionsInTimeRange, _timerFilterTag
+    ) { sessions, tag ->
+        if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Tag-filtered count by date for chart
+    val filteredTimerCountByDate: StateFlow<List<DateCountPair>> = combine(
+        _sessionsInTimeRange, _timerFilterTag
+    ) { sessions, tag ->
+        val filtered = if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
+        filtered
+            .groupBy { session ->
+                java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                    .format(java.util.Date(session.timestamp))
+            }
+            .map { (date, list) -> DateCountPair(date, list.size) }
+            .sortedBy { it.date }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _syncState = MutableStateFlow<SyncState>(SyncState.IDLE)
     val syncState: StateFlow<SyncState> = _syncState
@@ -198,21 +222,12 @@ class HeartRateViewModel @Inject constructor(
             _dailyStats.value = heartRateRepository.getDailyStats(sevenDaysAgo)
         }
 
-        // Load filtered timer sessions based on selected time range
+        // Load timer sessions filtered by time range (tag filter applied via combine above)
         viewModelScope.launch {
             _timerFilterDays.collect { days ->
                 val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
                 timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
-                    _filteredTimerSessions.value = sessions
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            _timerFilterDays.collect { days ->
-                val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
-                timerSessionRepository.getCountByDateAfter(afterTimestamp).collect { pairs ->
-                    _filteredTimerCountByDate.value = pairs
+                    _sessionsInTimeRange.value = sessions
                 }
             }
         }
@@ -325,6 +340,10 @@ class HeartRateViewModel @Inject constructor(
      */
     fun setTimerFilterDays(days: Int) {
         _timerFilterDays.value = days
+    }
+
+    fun setTimerFilterTag(tag: String?) {
+        _timerFilterTag.value = tag
     }
 
     /**

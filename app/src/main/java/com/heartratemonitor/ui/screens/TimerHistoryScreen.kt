@@ -10,6 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
@@ -36,6 +39,8 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
     val sessions by viewModel.filteredTimerSessions.collectAsState()
     val countByDate by viewModel.filteredTimerCountByDate.collectAsState()
     val currentFilter by viewModel.timerFilterDays.collectAsState()
+    val currentTagFilter by viewModel.timerFilterTag.collectAsState()
+    val allSessionsInRange by viewModel.sessionsInTimeRange.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -71,16 +76,46 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
         // Table header
+        val availableTags = allSessionsInRange.mapNotNull { it.tag }.distinct()
+        var tagMenuExpanded by remember { mutableStateOf(false) }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("日期", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-            Text("计时类型", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-            Text("计时时间", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+            Text("日期", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f))
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                Text(
+                    text = if (currentTagFilter.isNullOrBlank()) "计时类型" else "计时类型($currentTagFilter)",
+                    fontSize = 12.sp,
+                    fontWeight = if (currentTagFilter != null) FontWeight.Bold else FontWeight.Normal,
+                    color = if (currentTagFilter != null) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.clickable { tagMenuExpanded = true }
+                )
+                DropdownMenu(
+                    expanded = tagMenuExpanded,
+                    onDismissRequest = { tagMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("全部", fontSize = 14.sp) },
+                        onClick = {
+                            viewModel.setTimerFilterTag(null)
+                            tagMenuExpanded = false
+                        }
+                    )
+                    availableTags.forEach { tag ->
+                        DropdownMenuItem(
+                            text = { Text(tag, fontSize = 14.sp) },
+                            onClick = {
+                                viewModel.setTimerFilterTag(tag)
+                                tagMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            Text("计时时间", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f), textAlign = TextAlign.End)
         }
 
         // History list
@@ -98,8 +133,8 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 items(sessions) { session ->
                     val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
@@ -111,41 +146,43 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = dateStr,
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
                         )
-                        if (!session.tag.isNullOrBlank()) {
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            if (!session.tag.isNullOrBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                ) {
+                                    Text(
+                                        text = session.tag,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.primaryContainer
                             ) {
                                 Text(
-                                    text = session.tag,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    text = durationStr,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
-                        } else {
-                            Spacer(modifier = Modifier.width(40.dp))
-                        }
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(
-                                text = durationStr,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
                         }
                     }
                 }
