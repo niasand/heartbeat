@@ -109,11 +109,29 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = dateStr,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = dateStr,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (!session.tag.isNullOrBlank()) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                        ) {
+                                            Text(
+                                                text = session.tag,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
                                 Surface(
                                     shape = MaterialTheme.shapes.small,
                                     color = MaterialTheme.colorScheme.primaryContainer
@@ -124,20 +142,6 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                            if (!session.tag.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                                ) {
-                                    Text(
-                                        text = session.tag,
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                                     )
                                 }
                             }
