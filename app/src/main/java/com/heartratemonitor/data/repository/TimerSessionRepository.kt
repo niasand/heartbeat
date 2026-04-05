@@ -40,4 +40,8 @@ class TimerSessionRepository @Inject constructor(
     suspend fun deleteAll() {
         timerSessionDao.deleteAll()
     }
+
+    suspend fun deleteSession(timestamp: Long) {
+        timerSessionDao.deleteByTimestamp(timestamp)
+    }
 }

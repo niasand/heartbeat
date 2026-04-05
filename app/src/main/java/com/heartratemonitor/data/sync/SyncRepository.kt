@@ -94,4 +94,14 @@ class SyncRepository @Inject constructor(
             restoredTimerSessions = tsEntities.size
         )
     }
+
+    /**
+     * Delete timer sessions by timestamps from cloud (D1)
+     */
+    suspend fun deleteFromCloud(timestamps: List<Long>): DeleteResponse {
+        if (timestamps.isEmpty()) {
+            return DeleteResponse(success = true, deletedCount = 0)
+        }
+        return syncApiClient.deleteData(DeleteRequest(timestamps))
+    }
 }

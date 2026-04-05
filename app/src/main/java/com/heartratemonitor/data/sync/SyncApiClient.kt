@@ -87,4 +87,36 @@ class SyncApiClient @Inject constructor() {
             )
         }
     }
+
+    /**
+     * Delete timer sessions by timestamps from Cloudflare Workers
+     */
+    suspend fun deleteData(request: DeleteRequest): DeleteResponse = withContext(Dispatchers.IO) {
+        val json = gson.toJson(request)
+        val body = json.toRequestBody(jsonMediaType)
+
+        val httpRequest = Request.Builder()
+            .url(ApiConfig.SYNC_API_URL)
+            .delete(body)
+            .build()
+
+        try {
+            val response = httpClient.newCall(httpRequest).execute()
+            val responseBody = response.body?.string()
+
+            if (response.isSuccessful && responseBody != null) {
+                gson.fromJson(responseBody, DeleteResponse::class.java)
+            } else {
+                DeleteResponse(
+                    success = false,
+                    message = "HTTP ${response.code}: ${responseBody ?: "empty response"}"
+                )
+            }
+        } catch (e: Exception) {
+            DeleteResponse(
+                success = false,
+                message = e.message ?: "Network error"
+            )
+        }
+    }
 }

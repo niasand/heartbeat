@@ -3,7 +3,7 @@ export default {
     const corsHeaders = {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
@@ -70,6 +70,35 @@ export default {
 
         return new Response(
           JSON.stringify({ success: true, syncedHeartRates: syncedHR, syncedTimerSessions: syncedTS }),
+          { status: 200, headers: corsHeaders }
+        );
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ success: false, message: e.message }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+    }
+
+    // DELETE: remove records by timestamps
+    if (request.method === "DELETE") {
+      try {
+        const body = await request.json();
+        const { timestamps = [] } = body;
+
+        let deletedCount = 0;
+
+        if (timestamps.length > 0) {
+          const stmt = env.DB.prepare(
+            `DELETE FROM timer_sessions WHERE timestamp = ?`
+          );
+          const batch = timestamps.map((ts) => stmt.bind(ts));
+          await env.DB.batch(batch);
+          deletedCount = timestamps.length;
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, deletedCount }),
           { status: 200, headers: corsHeaders }
         );
       } catch (e) {
