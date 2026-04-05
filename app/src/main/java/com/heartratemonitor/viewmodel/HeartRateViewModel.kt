@@ -123,8 +123,15 @@ class HeartRateViewModel @Inject constructor(
     private val _timerFilterTag = MutableStateFlow<String?>(null)
     val timerFilterTag: StateFlow<String?> = _timerFilterTag
 
-    private val _filteredTimerSessions = MutableStateFlow<List<TimerSessionEntity>>(emptyList())
-    val filteredTimerSessions: StateFlow<List<TimerSessionEntity>> = _filteredTimerSessions
+    // Time-range filtered sessions (before tag filter)
+    private val _sessionsInTimeRange = MutableStateFlow<List<TimerSessionEntity>>(emptyList())
+
+    // Final filtered sessions = time range filter + tag filter
+    val filteredTimerSessions: StateFlow<List<TimerSessionEntity>> = combine(
+        _sessionsInTimeRange, _timerFilterTag
+    ) { sessions, tag ->
+        if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _filteredTimerCountByDate = MutableStateFlow<List<DateCountPair>>(emptyList())
     val filteredTimerCountByDate: StateFlow<List<DateCountPair>> = _filteredTimerCountByDate
@@ -203,15 +210,12 @@ class HeartRateViewModel @Inject constructor(
             _dailyStats.value = heartRateRepository.getDailyStats(sevenDaysAgo)
         }
 
-        // Load filtered timer sessions based on selected time range and tag
+        // Load timer sessions filtered by time range (tag filter applied via combine above)
         viewModelScope.launch {
-            combine(_timerFilterDays, _timerFilterTag) { days, tag ->
-                Pair(days, tag)
-            }.collect { (days, tag) ->
+            _timerFilterDays.collect { days ->
                 val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
                 timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
-                    _filteredTimerSessions.value = if (tag.isNullOrBlank()) sessions
-                        else sessions.filter { it.tag == tag }
+                    _sessionsInTimeRange.value = sessions
                 }
             }
         }
