@@ -30,10 +30,12 @@ class MainActivity : ComponentActivity() {
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             service = (binder as BleHeartRateService.LocalBinder).getService()
+            isBound = true
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
             service = null
+            isBound = false
         }
     }
 
@@ -46,8 +48,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        val intent = Intent(this, BleHeartRateService::class.java)
-        isBound = bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        if (!isBound) {
+            val intent = Intent(this, BleHeartRateService::class.java)
+            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        }
     }
 
     override fun onStop() {
