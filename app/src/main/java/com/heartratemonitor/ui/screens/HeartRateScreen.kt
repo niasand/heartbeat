@@ -420,6 +420,7 @@ fun RealTimeHeartRateScreen(
  * 简易倒计时组件
  * 支持设置分钟和秒、开始/暂停，倒计时结束播放铃声
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CountdownTimerCard(viewModel: HeartRateViewModel) {
     var totalSeconds by remember { mutableIntStateOf(40) }
