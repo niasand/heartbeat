@@ -510,51 +510,55 @@ fun CountdownTimerCard(viewModel: HeartRateViewModel) {
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
             )
 
-            // 标签输入
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.06f),
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
-                )
+            // 倒计时显示 + 标签（同行）
+            val minutes = remainingSeconds / 60
+            val seconds = remainingSeconds % 60
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                BasicTextField(
-                    value = tagInput,
-                    onValueChange = { tagInput = it },
-                    modifier = Modifier
-                        .width(180.dp)
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
-                    ),
-                    singleLine = true,
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f))
-                ) { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (tagInput.isEmpty()) {
-                            Text(
-                                text = "为这次计时加个标签…",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.35f)
-                            )
+                Text(
+                    text = "%02d:%02d".format(minutes, seconds),
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (remainingSeconds == 0) AppColors.HeartRateCritical
+                        else MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.06f),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
+                    )
+                ) {
+                    BasicTextField(
+                        value = tagInput,
+                        onValueChange = { tagInput = it },
+                        modifier = Modifier
+                            .widthIn(min = 80.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+                        ),
+                        singleLine = true,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f))
+                    ) { innerTextField ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (tagInput.isEmpty()) {
+                                Text(
+                                    text = "标签…",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.35f)
+                                )
+                            }
+                            innerTextField()
                         }
-                        innerTextField()
                     }
                 }
             }
-
-            // 倒计时显示 MM:SS
-            val minutes = remainingSeconds / 60
-            val seconds = remainingSeconds % 60
-            Text(
-                text = "%02d:%02d".format(minutes, seconds),
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (remainingSeconds == 0) AppColors.HeartRateCritical
-                    else MaterialTheme.colorScheme.onSecondaryContainer
-            )
 
             // 输入框在左，标签在右，开始按钮最后
             Row(
