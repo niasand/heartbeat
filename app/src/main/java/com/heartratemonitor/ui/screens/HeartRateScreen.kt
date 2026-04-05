@@ -279,7 +279,7 @@ fun RealTimeHeartRateScreen(
     ) {
         // 心率显示卡片（紧凑版）
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.size(180.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
