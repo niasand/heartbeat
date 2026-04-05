@@ -125,6 +125,7 @@ class HeartRateViewModel @Inject constructor(
 
     // Time-range filtered sessions (before tag filter)
     private val _sessionsInTimeRange = MutableStateFlow<List<TimerSessionEntity>>(emptyList())
+    val sessionsInTimeRange: StateFlow<List<TimerSessionEntity>> = _sessionsInTimeRange
 
     // Final filtered sessions = time range filter + tag filter
     val filteredTimerSessions: StateFlow<List<TimerSessionEntity>> = combine(
@@ -133,8 +134,19 @@ class HeartRateViewModel @Inject constructor(
         if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    private val _filteredTimerCountByDate = MutableStateFlow<List<DateCountPair>>(emptyList())
-    val filteredTimerCountByDate: StateFlow<List<DateCountPair>> = _filteredTimerCountByDate
+    // Tag-filtered count by date for chart
+    val filteredTimerCountByDate: StateFlow<List<DateCountPair>> = combine(
+        _sessionsInTimeRange, _timerFilterTag
+    ) { sessions, tag ->
+        val filtered = if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
+        filtered
+            .groupBy { session ->
+                java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                    .format(java.util.Date(session.timestamp))
+            }
+            .map { (date, list) -> DateCountPair(date, list.size) }
+            .sortedBy { it.date }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _syncState = MutableStateFlow<SyncState>(SyncState.IDLE)
     val syncState: StateFlow<SyncState> = _syncState
@@ -216,15 +228,6 @@ class HeartRateViewModel @Inject constructor(
                 val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
                 timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
                     _sessionsInTimeRange.value = sessions
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            _timerFilterDays.collect { days ->
-                val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
-                timerSessionRepository.getCountByDateAfter(afterTimestamp).collect { pairs ->
-                    _filteredTimerCountByDate.value = pairs
                 }
             }
         }

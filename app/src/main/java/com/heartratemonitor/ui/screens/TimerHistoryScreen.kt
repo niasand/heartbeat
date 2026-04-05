@@ -40,6 +40,7 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
     val countByDate by viewModel.filteredTimerCountByDate.collectAsState()
     val currentFilter by viewModel.timerFilterDays.collectAsState()
     val currentTagFilter by viewModel.timerFilterTag.collectAsState()
+    val allSessionsInRange by viewModel.sessionsInTimeRange.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -75,7 +76,7 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
         // Table header
-        val availableTags = sessions.mapNotNull { it.tag }.distinct()
+        val availableTags = allSessionsInRange.mapNotNull { it.tag }.distinct()
         var tagMenuExpanded by remember { mutableStateOf(false) }
         Row(
             modifier = Modifier
