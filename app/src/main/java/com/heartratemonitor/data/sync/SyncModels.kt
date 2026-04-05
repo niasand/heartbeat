@@ -69,3 +69,16 @@ data class RestoreResult(
     val restoredTimerSessions: Int = 0,
     val error: String? = null
 )
+
+/**
+ * Delete request body for removing records from cloud
+ */
+data class DeleteRequest(
+    val timestamps: List<Long>
+)
+
+data class DeleteResponse(
+    val success: Boolean,
+    val deletedCount: Int = 0,
+    val message: String? = null
+)

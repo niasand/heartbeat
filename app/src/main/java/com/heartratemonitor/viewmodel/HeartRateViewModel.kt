@@ -347,6 +347,17 @@ class HeartRateViewModel @Inject constructor(
     }
 
     /**
+     * Delete a timer session by timestamp, both local and cloud.
+     * Local deletion first for instant UI feedback.
+     */
+    fun deleteTimerSession(timestamp: Long) {
+        viewModelScope.launch {
+            timerSessionRepository.deleteSession(timestamp)
+            syncRepository.deleteFromCloud(listOf(timestamp))
+        }
+    }
+
+    /**
      * Save timer session when countdown finishes
      */
     fun saveTimerSession(durationSeconds: Int, tag: String? = null) {

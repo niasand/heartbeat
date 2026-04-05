@@ -43,6 +43,9 @@ interface TimerSessionDao {
     """)
     fun getSessionsAfter(afterTimestamp: Long): Flow<List<TimerSessionEntity>>
 
+    @Query("DELETE FROM timer_sessions WHERE timestamp = :timestamp")
+    suspend fun deleteByTimestamp(timestamp: Long)
+
     @Query("DELETE FROM timer_sessions")
     suspend fun deleteAll()
 

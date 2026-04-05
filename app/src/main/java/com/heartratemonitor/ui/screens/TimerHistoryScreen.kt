@@ -2,7 +2,9 @@ package com.heartratemonitor.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +27,8 @@ import com.heartratemonitor.viewmodel.HeartRateViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 private val filterOptions = listOf(
     "7天" to 7,
@@ -33,10 +37,11 @@ private val filterOptions = listOf(
     "1年" to 365
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
     val sessions by viewModel.filteredTimerSessions.collectAsState()
+    val context = LocalContext.current
     val countByDate by viewModel.filteredTimerCountByDate.collectAsState()
     val currentFilter by viewModel.timerFilterDays.collectAsState()
     val currentTagFilter by viewModel.timerFilterTag.collectAsState()
@@ -146,7 +151,13 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 8.dp)
+                            .combinedClickable(
+                                onClick = { },
+                                onLongClick = {
+                                    viewModel.deleteTimerSession(session.timestamp)
+                                }
+                            ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
