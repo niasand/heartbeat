@@ -94,7 +94,6 @@ interface HeartRateDao {
         WHERE timestamp >= :sinceTimestamp
         GROUP BY date
         ORDER BY date ASC
-        LIMIT 7
     """)
     suspend fun getDailyStats(sinceTimestamp: Long): List<DailyHeartRateStats>
 }
