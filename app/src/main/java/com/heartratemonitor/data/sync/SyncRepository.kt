@@ -42,7 +42,7 @@ class SyncRepository @Inject constructor(
                 HeartRateRecord(timestamp = it.timestamp, heartRate = it.heartRate)
             },
             timerSessions = timerSessions.map {
-                TimerSessionRecord(timestamp = it.timestamp, durationSeconds = it.durationSeconds)
+                TimerSessionRecord(timestamp = it.timestamp, durationSeconds = it.durationSeconds, tag = it.tag)
             }
         )
 
