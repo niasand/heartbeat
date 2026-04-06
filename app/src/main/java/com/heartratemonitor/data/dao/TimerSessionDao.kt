@@ -49,6 +49,18 @@ interface TimerSessionDao {
     @Query("DELETE FROM timer_sessions")
     suspend fun deleteAll()
 
+    /**
+     * 获取所有计时记录（同步，用于备份）
+     */
+    @Query("SELECT * FROM timer_sessions ORDER BY timestamp ASC")
+    suspend fun getAllSync(): List<TimerSessionEntity>
+
+    /**
+     * 获取所有已存在的计时记录时间戳（用于恢复去重）
+     */
+    @Query("SELECT timestamp FROM timer_sessions")
+    suspend fun getAllTimestamps(): List<Long>
+
     @Query("SELECT * FROM timer_sessions WHERE timestamp > :afterTimestamp ORDER BY timestamp ASC")
     suspend fun getAfter(afterTimestamp: Long): List<TimerSessionEntity>
 }

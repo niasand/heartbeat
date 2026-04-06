@@ -2,6 +2,7 @@ package com.heartratemonitor.di
 
 import com.heartratemonitor.data.sync.SyncApiClient
 import com.heartratemonitor.data.sync.SyncRepository
+import com.heartratemonitor.data.sync.LocalBackupManager
 import com.heartratemonitor.data.dao.HeartRateDao
 import com.heartratemonitor.data.dao.TimerSessionDao
 import com.heartratemonitor.data.pref.PreferencesManager
@@ -27,8 +28,9 @@ object NetworkModule {
         heartRateDao: HeartRateDao,
         timerSessionDao: TimerSessionDao,
         syncApiClient: SyncApiClient,
-        preferencesManager: PreferencesManager
+        preferencesManager: PreferencesManager,
+        localBackupManager: LocalBackupManager
     ): SyncRepository {
-        return SyncRepository(heartRateDao, timerSessionDao, syncApiClient, preferencesManager)
+        return SyncRepository(heartRateDao, timerSessionDao, syncApiClient, preferencesManager, localBackupManager)
     }
 }

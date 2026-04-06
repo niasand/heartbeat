@@ -87,6 +87,7 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
     val lowThreshold by viewModel.lowThreshold.collectAsState()
     val themeColor by viewModel.themeColor.collectAsState()
     val savedSoundUri by viewModel.timerSoundUri.collectAsState()
+    val heartbeatSoundEnabled by viewModel.heartbeatSoundEnabled.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -207,6 +208,28 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
                 }
             }
 
+            // 心率声音开关
+            SettingsCard(title = "心率声音") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "连接心率带时，发出类似医院监护仪的\"滴\"声",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("启用心率声音", style = MaterialTheme.typography.bodyMedium)
+                        Switch(
+                            checked = heartbeatSoundEnabled,
+                            onCheckedChange = { viewModel.saveHeartbeatSoundEnabled(it) }
+                        )
+                    }
+                }
+            }
+
             // 倒计时铃声设置卡片
             TimerSoundSettingCard(
                 savedSoundUri = savedSoundUri,
@@ -219,8 +242,10 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
                 syncState = syncState,
                 restoreState = viewModel.restoreState.collectAsState().value,
                 lastSyncTime = lastSyncTime,
+                hasLocalBackup = viewModel.hasLocalBackup,
+                localBackupTime = viewModel.localBackupTime,
                 onSync = { viewModel.syncToCloud() },
-                onRestore = { viewModel.restoreFromCloud() }
+                onRestore = { viewModel.restoreFromBackup() }
             )
 
             // 提示信息
@@ -580,16 +605,18 @@ fun DataSyncCard(
     syncState: com.heartratemonitor.viewmodel.HeartRateViewModel.SyncState,
     restoreState: com.heartratemonitor.viewmodel.HeartRateViewModel.RestoreState,
     lastSyncTime: Long,
+    hasLocalBackup: Boolean,
+    localBackupTime: String?,
     onSync: () -> Unit,
     onRestore: () -> Unit
 ) {
     val isSyncing = syncState is com.heartratemonitor.viewmodel.HeartRateViewModel.SyncState.SYNCING
     val isRestoring = restoreState is com.heartratemonitor.viewmodel.HeartRateViewModel.RestoreState.RESTORING
 
-    SettingsCard(title = "数据同步") {
+    SettingsCard(title = "数据备份与恢复") {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = "将心率数据和计时记录同步到云端备份",
+                text = "同步时同时备份到云端和本地，恢复时优先使用本地备份",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -610,6 +637,17 @@ fun DataSyncCard(
                 )
             }
 
+            // 本地备份信息
+            Text(
+                text = if (hasLocalBackup && localBackupTime != null) {
+                    "本地备份: $localBackupTime"
+                } else {
+                    "本地备份: 无"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (hasLocalBackup) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             // 同步按钮
             Button(
                 onClick = onSync,
@@ -623,9 +661,9 @@ fun DataSyncCard(
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("同步中...")
+                    Text("备份中...")
                 } else {
-                    Text("同步到云端")
+                    Text("同步到云端并本地备份")
                 }
             }
 
@@ -644,7 +682,7 @@ fun DataSyncCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("恢复中...")
                 } else {
-                    Text("从云端恢复")
+                    Text("恢复数据")
                 }
             }
 
