@@ -304,15 +304,19 @@ class HeartRateViewModel @Inject constructor(
      * 计算统计数据
      */
     private fun calculateStats(entities: List<HeartRateEntity>) {
-        if (entities.isEmpty()) {
+        // 只统计过去24小时的数据，与 BySec 图表窗口一致
+        val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+        val recentEntities = entities.filter { it.timestamp >= oneDayAgo }
+
+        if (recentEntities.isEmpty()) {
             _heartRateStats.value = null
             return
         }
 
-        val avg = entities.map { it.heartRate }.average()
-        val max = entities.maxOfOrNull { it.heartRate } ?: 0
-        val min = entities.minOfOrNull { it.heartRate } ?: 0
-        val count = entities.size
+        val avg = recentEntities.map { it.heartRate }.average()
+        val max = recentEntities.maxOfOrNull { it.heartRate } ?: 0
+        val min = recentEntities.minOfOrNull { it.heartRate } ?: 0
+        val count = recentEntities.size
 
         _heartRateStats.value = HeartRateStats(avg, max, min, count)
     }

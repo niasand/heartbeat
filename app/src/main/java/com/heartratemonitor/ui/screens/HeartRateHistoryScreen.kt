@@ -156,10 +156,10 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         allHeartRateHistory.take(600)
     }
 
-    // 3. 预过滤最近3小时数据（用于图表），仅在数据变化时计算，避免 tick 触发全量扫描
-    val threeHourData = remember(allHeartRateHistory) {
-        val threeHoursAgo = System.currentTimeMillis() - 180 * 60 * 1000L
-        allHeartRateHistory.filter { it.timestamp >= threeHoursAgo }
+    // 3. 预过滤最近24小时数据（用于图表），仅在数据变化时计算，避免 tick 触发全量扫描
+    val recentDayData = remember(allHeartRateHistory) {
+        val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+        allHeartRateHistory.filter { it.timestamp >= oneDayAgo }
     }
 
     val heartRateStats by viewModel.heartRateStats.collectAsState()
@@ -176,15 +176,15 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
     }
 
-    // 准备图表数据 (图表展示最新2小时)
-    // threeHourData 已按时间过滤；tick 仅驱动2小时窗口平移
-    val chartData: Any = remember(threeHourData, tick) {
-        if (threeHourData.isEmpty()) {
+    // 准备图表数据 (图表展示最新24小时)
+    // recentDayData 已按时间过滤；tick 仅驱动24小时窗口平移
+    val chartData: Any = remember(recentDayData, tick) {
+        if (recentDayData.isEmpty()) {
             Triple(emptyList<FloatEntry>(), 0L, 0)
         } else {
-            // 图表只展示最新2小时
-            val chartWindowStart = System.currentTimeMillis() - 120 * 60 * 1000
-            val chartData = threeHourData.filter { it.timestamp >= chartWindowStart }
+            // 图表展示最新24小时
+            val chartWindowStart = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+            val chartData = recentDayData.filter { it.timestamp >= chartWindowStart }
             if (chartData.isEmpty()) {
                 Triple(emptyList<FloatEntry>(), 0L, 0)
             } else {
@@ -238,7 +238,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     }
 
     // 固定标题
-    val chartTitle = "过去2小时心率趋势"
+    val chartTitle = "过去24小时心率趋势"
 
     // Handle empty data case for stats
     val displayStats = heartRateStats ?: HeartRateViewModel.HeartRateStats(0.0, 0, 0, 0)
