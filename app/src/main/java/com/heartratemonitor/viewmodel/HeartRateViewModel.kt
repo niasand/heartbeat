@@ -18,6 +18,8 @@ import com.heartratemonitor.ble.DeviceInfo
 import com.heartratemonitor.ble.ConnectionState
 import com.heartratemonitor.ble.AutoReconnectState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -51,6 +53,15 @@ class HeartRateViewModel @Inject constructor(
 
     private val _currentHeartRate = MutableStateFlow<Int?>(null)
     val currentHeartRate: StateFlow<Int?> = _currentHeartRate
+
+    // 心率声音开关
+    @Volatile private var isBeepEnabled = preferencesManager.cachedHeartbeatSoundEnabled
+
+    val heartbeatSoundEnabled: StateFlow<Boolean> = preferencesManager.heartbeatSoundEnabledFlow.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        PreferencesManager.DEFAULT_HEARTBEAT_SOUND_ENABLED
+    )
 
     // Use connection state from BleConnectionManager
     val connectionState: StateFlow<ConnectionState> = bleConnectionManager.connectionState
@@ -157,6 +168,12 @@ class HeartRateViewModel @Inject constructor(
         0L
     )
 
+    val hasLocalBackup: Boolean
+        get() = syncRepository.hasLocalBackup()
+
+    val localBackupTime: String?
+        get() = syncRepository.getLocalBackupTime()
+
     sealed class SyncState {
         data object IDLE : SyncState()
         data object SYNCING : SyncState()
@@ -206,7 +223,16 @@ class HeartRateViewModel @Inject constructor(
                 }
             }
         }
-        
+
+        // 同步声音开关状态到 BleConnectionManager
+        viewModelScope.launch {
+            preferencesManager.heartbeatSoundEnabledFlow.collect { enabled ->
+                isBeepEnabled = enabled
+                bleConnectionManager.setBeepEnabled(enabled)
+            }
+        }
+
+
         // 加载上次连接的设备地址
         viewModelScope.launch {
             lastDeviceAddress.collect { address ->
@@ -216,10 +242,12 @@ class HeartRateViewModel @Inject constructor(
             }
         }
 
-        // 加载过去7天的每日心率统计
+        // 加载过去7天的每日心率统计（随数据变化自动刷新）
         viewModelScope.launch {
-            val sevenDaysAgo = System.currentTimeMillis() - 7 * 24 * 3600 * 1000
-            _dailyStats.value = heartRateRepository.getDailyStats(sevenDaysAgo)
+            heartRateRepository.getAllHeartRates().collect {
+                val sevenDaysAgo = System.currentTimeMillis() - 7 * 24 * 3600 * 1000
+                _dailyStats.value = heartRateRepository.getDailyStats(sevenDaysAgo)
+            }
         }
 
         // Load timer sessions filtered by time range (tag filter applied via combine above)
@@ -304,7 +332,7 @@ class HeartRateViewModel @Inject constructor(
      * 计算统计数据
      */
     private fun calculateStats(entities: List<HeartRateEntity>) {
-        // 只统计过去24小时的数据，与 BySec 图表窗口一致
+        // 只统计过去24小时的数据，与图表窗口一致
         val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
         val recentEntities = entities.filter { it.timestamp >= oneDayAgo }
 
@@ -394,6 +422,7 @@ class HeartRateViewModel @Inject constructor(
     fun syncToCloud() {
         viewModelScope.launch {
             _syncState.value = SyncState.SYNCING
+            _restoreState.value = RestoreState.IDLE
             val result = syncRepository.syncToCloud()
             _syncState.value = if (result.success) {
                 SyncState.SUCCESS(result.syncedHeartRates, result.syncedTimerSessions)
@@ -404,18 +433,26 @@ class HeartRateViewModel @Inject constructor(
     }
 
     /**
-     * Restore all data from Cloudflare D1 to local
+     * Restore data: local backup first, fallback to cloud
      */
-    fun restoreFromCloud() {
+    fun restoreFromBackup() {
         viewModelScope.launch {
             _restoreState.value = RestoreState.RESTORING
-            val result = syncRepository.restoreFromCloud()
+            _syncState.value = SyncState.IDLE
+            val result = syncRepository.restoreFromBackup()
             _restoreState.value = if (result.success) {
                 RestoreState.SUCCESS(result.restoredHeartRates, result.restoredTimerSessions)
             } else {
                 RestoreState.ERROR(result.error ?: "Restore failed")
             }
         }
+    }
+
+    /**
+     * @deprecated Use restoreFromBackup() instead
+     */
+    fun restoreFromCloud() {
+        restoreFromBackup()
     }
 
     /**
@@ -453,5 +490,20 @@ class HeartRateViewModel @Inject constructor(
                 calculateStats(entities)
             }
         }
+    }
+
+    /**
+     * 保存心率声音开关
+     */
+    fun saveHeartbeatSoundEnabled(value: Boolean) {
+        isBeepEnabled = value
+        bleConnectionManager.setBeepEnabled(value)
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            preferencesManager.saveHeartbeatSoundEnabled(value)
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
     }
 }

@@ -53,6 +53,9 @@ import com.patrykandpatrick.vico.compose.chart.column.columnChart
 import com.patrykandpatrick.vico.core.component.shape.shader.DynamicShaders
 import com.patrykandpatrick.vico.compose.component.shape.shader.fromBrush
 import com.patrykandpatrick.vico.core.chart.values.AxisValuesOverrider
+import com.patrykandpatrick.vico.compose.chart.scroll.rememberChartScrollSpec
+import com.patrykandpatrick.vico.core.scroll.InitialScroll
+import com.patrykandpatrick.vico.core.scroll.AutoScrollCondition
 
 /**
  * 历史心率屏幕 - 简化版本
@@ -171,59 +174,35 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(60_000L)
+            kotlinx.coroutines.delay(3_000L)
             tick++
         }
     }
 
-    // 准备图表数据 (图表展示最新24小时)
-    // recentDayData 已按时间过滤；tick 仅驱动24小时窗口平移
-    val chartData: Any = remember(recentDayData, tick) {
+    // 图表数据：过去24小时，每1分钟一个点（取最大心率），基于预过滤数据确保实时更新
+    val (entries, baseTime) = remember(recentDayData, tick) {
         if (recentDayData.isEmpty()) {
-            Triple(emptyList<FloatEntry>(), 0L, 0)
+            Pair(emptyList<FloatEntry>(), 0L)
         } else {
-            // 图表展示最新24小时
-            val chartWindowStart = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+            val chartWindowStart = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
             val chartData = recentDayData.filter { it.timestamp >= chartWindowStart }
             if (chartData.isEmpty()) {
-                Triple(emptyList<FloatEntry>(), 0L, 0)
+                Pair(emptyList<FloatEntry>(), 0L)
             } else {
                 val baseTime = chartWindowStart
                 val interval = 60 * 1000L // 每1分钟一个点
                 val groupedData = chartData.groupBy { (it.timestamp / interval) * interval }
                 val data = groupedData.map { (timestamp, entities) ->
                     val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
-                    val xValue = ((timestamp - baseTime) / 60000f) // Convert to minutes
+                    val xValue = ((timestamp - baseTime) / 60000f)
                     FloatEntry(xValue, maxHeartRate)
                 }.sortedBy { it.x }
-                Triple(data, baseTime, 120)
+                Pair(data, baseTime)
             }
         }
     }
 
-    // Extract chart data and base time
-    val entries = if (chartData is Triple<*, *, *>) (chartData as Triple<List<FloatEntry>, Long, Int>).first else emptyList<FloatEntry>()
-    val baseTime = if (chartData is Triple<*, *, *>) (chartData as Triple<List<FloatEntry>, Long, Int>).second else 0L
-
-    // X轴格式化器 (固定2小时，每30分钟一个刻度)
-    val xAxisFormatter = remember(baseTime) {
-        AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
-            try {
-                val minutes = value.toInt()
-                if (minutes % 30 == 0 && minutes >= 0 && minutes <= 120) {
-                    minutes.toString()
-                } else {
-                    ""
-                }
-            } catch (e: Exception) {
-                ""
-            }
-        }
-    }
-
-    // X轴固定0-120分钟
-    val maxXValue = 120f
-    val minXValue = 0f
+    // X轴由 Vico 自动计算，填满整个图表宽度
 
     // 时间范围显示（随 tick 更新 endTime）
     val timeRangeText = remember(baseTime, tick) {
@@ -263,8 +242,8 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                StatItem("平均", displayStats.avg.toInt().toString(), AppColors.Primary)
                 StatItem("最高", displayStats.max.toString(), AppColors.HeartRateHigh)
+                StatItem("平均", displayStats.avg.toInt().toString(), AppColors.Primary)
                 StatItem("最低", displayStats.min.toString(), AppColors.HeartRateNormal)
             }
         }
@@ -335,39 +314,35 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
                         val chartEntryModel = entryModelOf(entries)
                         val marker = rememberMarker()
+                        val chartScrollSpec = rememberChartScrollSpec(
+                            initialScroll = InitialScroll.End,
+                            autoScrollCondition = object : AutoScrollCondition<com.patrykandpatrick.vico.core.entry.ChartEntryModel> {
+                                override fun shouldPerformAutoScroll(
+                                    newModel: com.patrykandpatrick.vico.core.entry.ChartEntryModel,
+                                    oldModel: com.patrykandpatrick.vico.core.entry.ChartEntryModel?
+                                ): Boolean = true
+                            }
+                        )
                         Chart(
                             chart = lineChart(
-                                spacing = 2.dp,
+                                spacing = 0.1.dp,
                                 axisValuesOverrider = AxisValuesOverrider.fixed(
-                                    minY = 50f,
-                                    maxY = 200f,
-                                    minX = minXValue,
-                                    maxX = maxXValue
+                                    minY = 70f,
+                                    maxY = 200f
                                 ),
                                 lines = listOf(
                                     com.patrykandpatrick.vico.core.chart.line.LineChart.LineSpec(
-                                        lineColor = android.graphics.Color.RED,
-                                        lineBackgroundShader = DynamicShaders.fromBrush(
-                                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                                colors = listOf(
-                                                    Color.Red.copy(alpha = 0.4f),
-                                                    Color.Transparent
-                                                )
-                                            )
-                                        )
+                                        lineColor = android.graphics.Color.RED
                                     )
                                 )
                             ),
                             model = chartEntryModel,
+                            chartScrollSpec = chartScrollSpec,
                             startAxis = rememberStartAxis(
                                 itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = 6),
                                 valueFormatter = { value, _ ->
                                     value.toInt().toString()
                                 }
-                            ),
-                            bottomAxis = rememberBottomAxis(
-                                valueFormatter = xAxisFormatter,
-                                guideline = null
                             ),
                             marker = marker,
                             modifier = Modifier.fillMaxSize()

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -41,6 +42,11 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     val cachedLowThreshold: Int
         get() = _cachedLowThreshold
 
+    @Volatile
+    private var _cachedHeartbeatSoundEnabled = DEFAULT_HEARTBEAT_SOUND_ENABLED
+    val cachedHeartbeatSoundEnabled: Boolean
+        get() = _cachedHeartbeatSoundEnabled
+
     companion object {
         // 高心率阈值
         private val HIGH_THRESHOLD_KEY = intPreferencesKey("high_threshold")
@@ -54,11 +60,14 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         private val TIMER_SOUND_URI_KEY = stringPreferencesKey("timer_sound_uri")
         // 上次同步时间
         private val LAST_SYNC_TIME_KEY = longPreferencesKey("last_sync_time")
+        // 心率声音开关
+        private val HEARTBEAT_SOUND_KEY = booleanPreferencesKey("heartbeat_sound_enabled")
 
         // 默认值
         const val DEFAULT_HIGH_THRESHOLD = 180
         const val DEFAULT_LOW_THRESHOLD = 60
         const val DEFAULT_THEME_COLOR = "#FF6200EE"
+        const val DEFAULT_HEARTBEAT_SOUND_ENABLED = false
     }
 
     /**
@@ -103,6 +112,13 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         preferences[LAST_SYNC_TIME_KEY] ?: 0L
     }
 
+    /**
+     * 获取心率声音开关
+     */
+    val heartbeatSoundEnabledFlow: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[HEARTBEAT_SOUND_KEY] ?: DEFAULT_HEARTBEAT_SOUND_ENABLED
+    }
+
     init {
         scope.launch {
             highThresholdFlow.collect {
@@ -112,6 +128,11 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         scope.launch {
             lowThresholdFlow.collect {
                 _cachedLowThreshold = it
+            }
+        }
+        scope.launch {
+            heartbeatSoundEnabledFlow.collect {
+                _cachedHeartbeatSoundEnabled = it
             }
         }
     }
@@ -167,6 +188,15 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     suspend fun saveLastSyncTime(value: Long) {
         dataStore.edit { preferences ->
             preferences[LAST_SYNC_TIME_KEY] = value
+        }
+    }
+
+    /**
+     * 保存心率声音开关
+     */
+    suspend fun saveHeartbeatSoundEnabled(value: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[HEARTBEAT_SOUND_KEY] = value
         }
     }
 }

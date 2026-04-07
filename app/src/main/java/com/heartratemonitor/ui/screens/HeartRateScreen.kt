@@ -289,27 +289,17 @@ fun RealTimeHeartRateScreen(
     // Track previous state to avoid showing toast when switching tabs
     var previousState by remember { mutableStateOf(connectionState) }
 
+    // 只保留连接成功和连接失败的 Toast
     LaunchedEffect(connectionState) {
-        if (connectionState is ConnectionState.CONNECTED && previousState !is ConnectionState.CONNECTED) {
-            Toast.makeText(context, "已连接高驰心率带", Toast.LENGTH_SHORT).show()
+        when {
+            connectionState is ConnectionState.CONNECTED && previousState !is ConnectionState.CONNECTED ->
+                Toast.makeText(context, "已连接高驰心率带", Toast.LENGTH_SHORT).show()
+            connectionState is ConnectionState.ERROR && previousState !is ConnectionState.ERROR ->
+                Toast.makeText(context, "连接失败: ${(connectionState as ConnectionState.ERROR).message}", Toast.LENGTH_LONG).show()
         }
         previousState = connectionState
     }
-    
-    // 自动重连提示
-    LaunchedEffect(autoReconnectState) {
-        when (autoReconnectState) {
-            is AutoReconnectState.RECONNECTING -> {
-                val state = autoReconnectState as AutoReconnectState.RECONNECTING
-                Toast.makeText(context, "正在尝试自动重连 (${state.attempt}/${state.maxAttempts})...", Toast.LENGTH_SHORT).show()
-            }
-            is AutoReconnectState.FAILED -> {
-                Toast.makeText(context, "自动重连失败，请手动连接", Toast.LENGTH_LONG).show()
-            }
-            else -> {}
-        }
-    }
-    
+
     // 自动扫描并连接心率带（只执行一次）
     // 优先检查是否已连接，如果已连接则直接显示数据
     LaunchedEffect(permissionsState.allPermissionsGranted) {
@@ -320,8 +310,6 @@ fun RealTimeHeartRateScreen(
 
         // 首先检查是否已经连接了心率带
         if (connectionState is ConnectionState.CONNECTED) {
-            // 已连接，直接显示数据，不需要任何操作
-            Toast.makeText(context, "已连接高驰心率带", Toast.LENGTH_SHORT).show()
             onHasAutoConnectedDeviceChange(true)
             return@LaunchedEffect
         }
@@ -332,34 +320,17 @@ fun RealTimeHeartRateScreen(
         // 如果有保存的设备地址，直接尝试连接
         val savedAddress = lastDeviceAddress
         if (!savedAddress.isNullOrEmpty()) {
-            Toast.makeText(context, "正在自动连接心率带...", Toast.LENGTH_SHORT).show()
             viewModel.connectToDevice(savedAddress)
         } else {
             // 没有保存的设备地址，开始扫描
             viewModel.startScan()
         }
     }
-    
+
     // 自动连接扫描到的第一个设备
     val scannedDevices by viewModel.scannedDevices.collectAsState()
     val scanState by viewModel.scanState.collectAsState()
     val savedDeviceAddress = lastDeviceAddress // 缓存避免重复获取
-    
-    // 显示扫描状态
-    LaunchedEffect(scanState) {
-        when (scanState) {
-            is BleScanner.ScanState.SCANNING -> {
-                if (!hasAutoConnectedDevice && savedDeviceAddress.isNullOrEmpty()) {
-                    Toast.makeText(context, "正在扫描心率带...", Toast.LENGTH_SHORT).show()
-                }
-            }
-            is BleScanner.ScanState.ERROR -> {
-                val error = scanState as BleScanner.ScanState.ERROR
-                Toast.makeText(context, "扫描失败: ${error.message}", Toast.LENGTH_LONG).show()
-            }
-            else -> {}
-        }
-    }
     
     LaunchedEffect(scannedDevices.size, connectionState) {
         if (hasAutoConnectedDevice) return@LaunchedEffect
@@ -372,7 +343,6 @@ fun RealTimeHeartRateScreen(
         if (scannedDevices.isNotEmpty() && savedDeviceAddress.isNullOrEmpty()) {
             onHasAutoConnectedDeviceChange(true)
             val firstDevice = scannedDevices.first()
-            Toast.makeText(context, "发现设备 ${firstDevice.name}，正在连接...", Toast.LENGTH_SHORT).show()
             viewModel.stopScan()
             viewModel.connectToDevice(firstDevice.address)
         }

@@ -76,6 +76,18 @@ interface HeartRateDao {
     suspend fun deleteAll()
 
     /**
+     * 获取所有心率数据（同步，用于备份）
+     */
+    @Query("SELECT * FROM heart_rates ORDER BY timestamp ASC")
+    suspend fun getAllSync(): List<HeartRateEntity>
+
+    /**
+     * 获取所有已存在的心率时间戳（用于恢复去重）
+     */
+    @Query("SELECT timestamp FROM heart_rates")
+    suspend fun getAllTimestamps(): List<Long>
+
+    /**
      * 获取指定时间之后的心率数据（增量同步用）
      */
     @Query("SELECT * FROM heart_rates WHERE timestamp > :afterTimestamp ORDER BY timestamp ASC")
