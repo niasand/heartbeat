@@ -159,6 +159,12 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         allHeartRateHistory.take(600)
     }
 
+    // 3. 预过滤最近24小时数据（用于图表），仅在数据变化时计算，避免 tick 触发全量扫描
+    val recentDayData = remember(allHeartRateHistory) {
+        val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+        allHeartRateHistory.filter { it.timestamp >= oneDayAgo }
+    }
+
     val heartRateStats by viewModel.heartRateStats.collectAsState()
     val dailyStats by viewModel.dailyStats.collectAsState()
 
@@ -173,24 +179,26 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
     }
 
-    // 图表数据：过去3小时，每30秒一个点（取最大心率），直接依赖数据源确保实时更新
-    val (entries, baseTime) = remember(allHeartRateHistory, tick) {
-        val threeHoursAgo = System.currentTimeMillis() - 180 * 60 * 1000L
-        val filteredData = allHeartRateHistory.filter { it.timestamp >= threeHoursAgo }
-        if (filteredData.isEmpty()) {
+    // 图表数据：过去24小时，每1分钟一个点（取最大心率），基于预过滤数据确保实时更新
+    val (entries, baseTime) = remember(recentDayData, tick) {
+        if (recentDayData.isEmpty()) {
             Pair(emptyList<FloatEntry>(), 0L)
         } else {
-            val baseTime = threeHoursAgo
-            // 每30秒一个点，取该区间内的最大心率值
-            val interval = 30 * 1000L
-            val groupedData = filteredData.groupBy { (it.timestamp / interval) * interval }
-            val data = groupedData.map { (_, entities) ->
-                val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
-                val xMinute = ((entities.first().timestamp - baseTime) / 60000.0)
-                // Vico 要求 x 值最多两位小数
-                FloatEntry(Math.round(xMinute * 100) / 100f, maxHeartRate)
-            }.sortedBy { it.x }
-            Pair(data, baseTime)
+            val chartWindowStart = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            val chartData = recentDayData.filter { it.timestamp >= chartWindowStart }
+            if (chartData.isEmpty()) {
+                Pair(emptyList<FloatEntry>(), 0L)
+            } else {
+                val baseTime = chartWindowStart
+                val interval = 60 * 1000L // 每1分钟一个点
+                val groupedData = chartData.groupBy { (it.timestamp / interval) * interval }
+                val data = groupedData.map { (timestamp, entities) ->
+                    val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
+                    val xValue = ((timestamp - baseTime) / 60000f)
+                    FloatEntry(xValue, maxHeartRate)
+                }.sortedBy { it.x }
+                Pair(data, baseTime)
+            }
         }
     }
 
@@ -209,7 +217,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     }
 
     // 固定标题
-    val chartTitle = "过去3小时心率趋势"
+    val chartTitle = "过去24小时心率趋势"
 
     // Handle empty data case for stats
     val displayStats = heartRateStats ?: HeartRateViewModel.HeartRateStats(0.0, 0, 0, 0)

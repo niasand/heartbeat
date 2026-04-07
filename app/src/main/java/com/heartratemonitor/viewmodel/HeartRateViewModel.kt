@@ -332,9 +332,9 @@ class HeartRateViewModel @Inject constructor(
      * 计算统计数据
      */
     private fun calculateStats(entities: List<HeartRateEntity>) {
-        // 只统计过去1小时的数据
-        val oneHourAgo = System.currentTimeMillis() - 1 * 60 * 60 * 1000L
-        val recentEntities = entities.filter { it.timestamp >= oneHourAgo }
+        // 只统计过去24小时的数据，与图表窗口一致
+        val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+        val recentEntities = entities.filter { it.timestamp >= oneDayAgo }
 
         if (recentEntities.isEmpty()) {
             _heartRateStats.value = null
