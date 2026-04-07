@@ -173,25 +173,25 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
     }
 
-    // 实时图表：2分钟滚动窗口，每2秒一个点（类似医院监护仪，持续向前打点）
+    // 实时图表：每2秒一个点，持续向前延伸（类似医院监护仪）
     // baseTime 对齐到2秒边界，同一 tick 周期内 x 坐标不变，避免横跳
     val (entries, baseTime) = remember(allHeartRateHistory, tick) {
-        val windowSeconds = 120 // 2分钟
         val interval = 2_000L // 每2秒一个点
         val now = (System.currentTimeMillis() / interval) * interval
-        val windowStart = now - windowSeconds * 1000L
-        val recentData = allHeartRateHistory.filter { it.timestamp >= windowStart && it.timestamp <= now }
+        // 使用本次监测会话的最早数据作为起点，只过滤本次连接后的数据
+        val recentData = allHeartRateHistory.filter { it.timestamp <= now }
 
         if (recentData.isEmpty()) {
             Pair(emptyList<FloatEntry>(), 0L)
         } else {
+            val sessionStart = (recentData.first().timestamp / interval) * interval
             val groupedData = recentData.groupBy { (it.timestamp / interval) * interval }
             val data = groupedData.map { (timestamp, entities) ->
                 val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
-                val xValue = ((timestamp - windowStart) / 1000f) // x 轴单位：秒
+                val xValue = ((timestamp - sessionStart) / 1000f) // x 轴单位：秒，从会话开始累计
                 FloatEntry(xValue, maxHeartRate)
             }.sortedBy { it.x }
-            Pair(data, windowStart)
+            Pair(data, sessionStart)
         }
     }
 
@@ -200,7 +200,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         if (baseTime > 0) {
             val sdf = SimpleDateFormat("HH:mm:ss", Locale.CHINA)
             val startTime = sdf.format(baseTime)
-            val endTime = sdf.format(baseTime + 120_000L)
+            val endTime = sdf.format(System.currentTimeMillis())
             "$startTime - $endTime"
         } else {
             ""
@@ -317,8 +317,6 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             chart = lineChart(
                                 spacing = 0.1.dp,
                                 axisValuesOverrider = AxisValuesOverrider.fixed(
-                                    minX = 0f,
-                                    maxX = 120f,
                                     minY = 70f,
                                     maxY = 200f
                                 ),
@@ -339,6 +337,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             ),
                             bottomAxis = rememberBottomAxis(
                                 guideline = null,
+                                axis = null,
                                 itemPlacer = AxisItemPlacer.Horizontal.default(spacing = 30),
                                 valueFormatter = { value, _ ->
                                     "${value.toInt()}s"
