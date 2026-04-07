@@ -170,21 +170,22 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
     var showDailyStats by remember { mutableStateOf(false) }
 
-    // 每分钟 tick 一次，确保图表窗口始终跟随当前时间
+    // 每60秒 tick 一次，驱动图表窗口在整分钟边界移动，避免曲线横跳
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(3_000L)
+            kotlinx.coroutines.delay(60_000L)
             tick++
         }
     }
 
     // 图表数据：过去24小时，每1分钟一个点（取最大心率），基于预过滤数据确保实时更新
+    // baseTime 对齐到分钟边界，确保 x 坐标在两次 tick 之间不会偏移
     val (entries, baseTime) = remember(recentDayData, tick) {
         if (recentDayData.isEmpty()) {
             Pair(emptyList<FloatEntry>(), 0L)
         } else {
-            val chartWindowStart = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            val chartWindowStart = (System.currentTimeMillis() / 60_000L) * 60_000L - 24 * 60 * 60 * 1000L
             val chartData = recentDayData.filter { it.timestamp >= chartWindowStart }
             if (chartData.isEmpty()) {
                 Pair(emptyList<FloatEntry>(), 0L)
