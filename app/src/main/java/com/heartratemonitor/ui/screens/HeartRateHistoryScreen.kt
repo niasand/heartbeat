@@ -331,12 +331,14 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             model = chartEntryModel,
                             chartScrollSpec = chartScrollSpec,
                             startAxis = rememberStartAxis(
+                                guideline = null,
                                 itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = 6),
                                 valueFormatter = { value, _ ->
                                     value.toInt().toString()
                                 }
                             ),
                             bottomAxis = rememberBottomAxis(
+                                guideline = null,
                                 itemPlacer = AxisItemPlacer.Horizontal.default(spacing = 30),
                                 valueFormatter = { value, _ ->
                                     "${value.toInt()}s"
