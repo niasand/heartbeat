@@ -159,46 +159,57 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         allHeartRateHistory.take(600)
     }
 
+    // 3. 预过滤最近24小时数据（用于图表），仅在数据变化时计算，避免 tick 触发全量扫描
+    val recentDayData = remember(allHeartRateHistory) {
+        val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+        allHeartRateHistory.filter { it.timestamp >= oneDayAgo }
+    }
+
     val heartRateStats by viewModel.heartRateStats.collectAsState()
     val dailyStats by viewModel.dailyStats.collectAsState()
 
     var showDailyStats by remember { mutableStateOf(false) }
 
-    // 每2秒 tick 一次，驱动实时图表持续滚动打点
+    // 每5秒 tick 一次，确保新心率数据及时反映到图表
+    // baseTime 已对齐到分钟边界，不会因 tick 频繁变化而横跳
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(2_000L)
+            kotlinx.coroutines.delay(5_000L)
             tick++
         }
     }
 
-    // 实时图表：每2秒一个点，持续向前延伸（类似医院监护仪）
-    // baseTime 对齐到2秒边界，同一 tick 周期内 x 坐标不变，避免横跳
-    val (entries, baseTime) = remember(allHeartRateHistory, tick) {
-        val interval = 2_000L // 每2秒一个点
-        val now = (System.currentTimeMillis() / interval) * interval
-        // 使用本次监测会话的最早数据作为起点，只过滤本次连接后的数据
-        val recentData = allHeartRateHistory.filter { it.timestamp <= now }
-
-        if (recentData.isEmpty()) {
+    // 图表数据：过去24小时，每1分钟一个点（取最大心率），基于预过滤数据确保实时更新
+    // baseTime 对齐到分钟边界，确保 x 坐标在两次 tick 之间不会偏移
+    val (entries, baseTime) = remember(recentDayData, tick) {
+        if (recentDayData.isEmpty()) {
             Pair(emptyList<FloatEntry>(), 0L)
         } else {
-            val sessionStart = (recentData.first().timestamp / interval) * interval
-            val groupedData = recentData.groupBy { (it.timestamp / interval) * interval }
-            val data = groupedData.map { (timestamp, entities) ->
-                val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
-                val xValue = ((timestamp - sessionStart) / 1000f) // x 轴单位：秒，从会话开始累计
-                FloatEntry(xValue, maxHeartRate)
-            }.sortedBy { it.x }
-            Pair(data, sessionStart)
+            val chartWindowStart = (System.currentTimeMillis() / 60_000L) * 60_000L - 24 * 60 * 60 * 1000L
+            val chartData = recentDayData.filter { it.timestamp >= chartWindowStart }
+            if (chartData.isEmpty()) {
+                Pair(emptyList<FloatEntry>(), 0L)
+            } else {
+                val baseTime = chartWindowStart
+                val interval = 60 * 1000L // 每1分钟一个点
+                val groupedData = chartData.groupBy { (it.timestamp / interval) * interval }
+                val data = groupedData.map { (timestamp, entities) ->
+                    val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
+                    val xValue = ((timestamp - baseTime) / 60000f)
+                    FloatEntry(xValue, maxHeartRate)
+                }.sortedBy { it.x }
+                Pair(data, baseTime)
+            }
         }
     }
 
-    // 时间范围显示
+    // X轴由 Vico 自动计算，填满整个图表宽度
+
+    // 时间范围显示（随 tick 更新 endTime）
     val timeRangeText = remember(baseTime, tick) {
         if (baseTime > 0) {
-            val sdf = SimpleDateFormat("HH:mm:ss", Locale.CHINA)
+            val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
             val startTime = sdf.format(baseTime)
             val endTime = sdf.format(System.currentTimeMillis())
             "$startTime - $endTime"
@@ -207,7 +218,8 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
     }
 
-    val chartTitle = "实时心率"
+    // 固定标题
+    val chartTitle = "过去24小时心率趋势"
 
     // Handle empty data case for stats
     val displayStats = heartRateStats ?: HeartRateViewModel.HeartRateStats(0.0, 0, 0, 0)
@@ -329,18 +341,9 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             model = chartEntryModel,
                             chartScrollSpec = chartScrollSpec,
                             startAxis = rememberStartAxis(
-                                guideline = null,
                                 itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = 6),
                                 valueFormatter = { value, _ ->
                                     value.toInt().toString()
-                                }
-                            ),
-                            bottomAxis = rememberBottomAxis(
-                                guideline = null,
-                                axis = null,
-                                itemPlacer = AxisItemPlacer.Horizontal.default(spacing = 30),
-                                valueFormatter = { value, _ ->
-                                    "${value.toInt()}s"
                                 }
                             ),
                             marker = marker,
