@@ -170,11 +170,12 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
     var showDailyStats by remember { mutableStateOf(false) }
 
-    // 每60秒 tick 一次，驱动图表窗口在整分钟边界移动，避免曲线横跳
+    // 每5秒 tick 一次，确保新心率数据及时反映到图表
+    // baseTime 已对齐到分钟边界，不会因 tick 频繁变化而横跳
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(60_000L)
+            kotlinx.coroutines.delay(5_000L)
             tick++
         }
     }
