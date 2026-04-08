@@ -49,6 +49,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
 import com.heartratemonitor.ble.BleScanner
+import com.heartratemonitor.ui.components.HeartRateWaveView
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
@@ -71,9 +72,9 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
     val context = LocalContext.current
     var connectAttemptId by remember { mutableIntStateOf(0) }
 
-    // 自动连接状态提升到父组件，避免Tab切换时重复触发
-    var hasAutoConnectAttempted by remember { mutableStateOf(false) }
-    var hasAutoConnectedDevice by remember { mutableStateOf(false) }
+    // 自动连接状态从 ViewModel 读取，避免 Activity 切换时重置导致重复连接
+    val hasAutoConnectAttempted by viewModel.hasAutoConnectAttempted.collectAsState()
+    val hasAutoConnectedDevice by viewModel.hasAutoConnectedDevice.collectAsState()
 
     // 倒计时状态提升到此处，避免切换Tab时状态丢失
     var timerTotalSeconds by remember { mutableIntStateOf(40) }
@@ -204,10 +205,6 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
                     viewModel,
                     connectAttemptId,
                     { connectAttemptId = it },
-                    hasAutoConnectAttempted,
-                    { hasAutoConnectAttempted = it },
-                    hasAutoConnectedDevice,
-                    { hasAutoConnectedDevice = it },
                     TimerState(
                         totalSeconds = timerTotalSeconds,
                         remainingSeconds = timerRemainingSeconds,
@@ -257,10 +254,6 @@ fun RealTimeHeartRateScreen(
     viewModel: HeartRateViewModel = viewModel(),
     connectAttemptId: Int,
     onConnectAttemptIdChange: (Int) -> Unit = {},
-    hasAutoConnectAttempted: Boolean,
-    onHasAutoConnectAttemptedChange: (Boolean) -> Unit,
-    hasAutoConnectedDevice: Boolean,
-    onHasAutoConnectedDeviceChange: (Boolean) -> Unit,
     timerState: TimerState
 ) {
     val context = LocalContext.current
@@ -270,6 +263,9 @@ fun RealTimeHeartRateScreen(
     val lowThreshold by viewModel.lowThreshold.collectAsState()
     val autoReconnectState by viewModel.autoReconnectState.collectAsState()
     val lastDeviceAddress by viewModel.lastDeviceAddress.collectAsState()
+    val hasAutoConnectAttempted by viewModel.hasAutoConnectAttempted.collectAsState()
+    val hasAutoConnectedDevice by viewModel.hasAutoConnectedDevice.collectAsState()
+    val heartRateHistory by viewModel.heartRateHistory.collectAsState()
 
     // 权限状态（Android 13+ 需要 POST_NOTIFICATIONS 才能显示前台服务通知）
     val permissionsState = rememberMultiplePermissionsState(
@@ -306,11 +302,11 @@ fun RealTimeHeartRateScreen(
         if (!permissionsState.allPermissionsGranted) return@LaunchedEffect
         if (hasAutoConnectAttempted) return@LaunchedEffect
 
-        onHasAutoConnectAttemptedChange(true)
+        viewModel.markAutoConnectAttempted()
 
         // 首先检查是否已经连接了心率带
         if (connectionState is ConnectionState.CONNECTED) {
-            onHasAutoConnectedDeviceChange(true)
+            viewModel.markAutoConnectedDevice()
             return@LaunchedEffect
         }
 
@@ -335,13 +331,13 @@ fun RealTimeHeartRateScreen(
     LaunchedEffect(scannedDevices.size, connectionState) {
         if (hasAutoConnectedDevice) return@LaunchedEffect
         if (connectionState is ConnectionState.CONNECTED || connectionState is ConnectionState.CONNECTING) {
-            onHasAutoConnectedDeviceChange(true)
+            viewModel.markAutoConnectedDevice()
             return@LaunchedEffect
         }
-        
+
         // 如果正在扫描且找到了设备，自动连接第一个
         if (scannedDevices.isNotEmpty() && savedDeviceAddress.isNullOrEmpty()) {
-            onHasAutoConnectedDeviceChange(true)
+            viewModel.markAutoConnectedDevice()
             val firstDevice = scannedDevices.first()
             viewModel.stopScan()
             viewModel.connectToDevice(firstDevice.address)
@@ -429,6 +425,18 @@ fun RealTimeHeartRateScreen(
                 )
             }
         }
+
+        // 心电图波形曲线
+        HeartRateWaveView(
+            heartRateHistory = heartRateHistory.map { it.heartRate },
+            modifier = Modifier.fillMaxWidth(),
+            waveColor = when {
+                currentHeartRate == null -> Color.Gray.copy(alpha = 0.3f)
+                currentHeartRate!! > highThreshold -> AppColors.HeartRateCritical
+                currentHeartRate!! < lowThreshold -> AppColors.Warning
+                else -> AppColors.HeartRateNormal
+            }
+        )
 
         // 控制按钮
         Row(

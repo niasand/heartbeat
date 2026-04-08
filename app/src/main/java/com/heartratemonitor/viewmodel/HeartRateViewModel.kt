@@ -54,6 +54,12 @@ class HeartRateViewModel @Inject constructor(
     private val _currentHeartRate = MutableStateFlow<Int?>(null)
     val currentHeartRate: StateFlow<Int?> = _currentHeartRate
 
+    // 跟踪是否已尝试自动连接（跨 Activity 切换不丢失）
+    private val _hasAutoConnectAttempted = MutableStateFlow(false)
+    val hasAutoConnectAttempted: StateFlow<Boolean> = _hasAutoConnectAttempted
+    private val _hasAutoConnectedDevice = MutableStateFlow(false)
+    val hasAutoConnectedDevice: StateFlow<Boolean> = _hasAutoConnectedDevice
+
     // 心率声音开关
     @Volatile private var isBeepEnabled = preferencesManager.cachedHeartbeatSoundEnabled
 
@@ -263,6 +269,14 @@ class HeartRateViewModel @Inject constructor(
 
     fun startScan() {
         bleScanner.startScan()
+    }
+
+    fun markAutoConnectAttempted() {
+        _hasAutoConnectAttempted.value = true
+    }
+
+    fun markAutoConnectedDevice() {
+        _hasAutoConnectedDevice.value = true
     }
 
     fun stopScan() {
