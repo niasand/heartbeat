@@ -38,7 +38,7 @@ fun HeartRateWaveView(
 ) {
     val yAxisLabels = yAxisRange.step(50).toList()
     val density = LocalDensity.current
-    val labelWidth = with(density) { 36.dp.toPx() }
+    val labelWidth = with(density) { 38.dp.toPx() }
 
     Canvas(
         modifier = modifier.then(
@@ -129,7 +129,7 @@ fun HeartRateWaveView(
                 data.forEachIndexed { index, hr ->
                     val x = leftPad + index * stepX
                     val normalizedHr = (hr - minVal) / range
-                    val y = topPad + normalizedHr * chartHeight
+                    val y = bottomPad - normalizedHr * chartHeight
 
                     if (index == 0) {
                         gradientPath.moveTo(x, y)
