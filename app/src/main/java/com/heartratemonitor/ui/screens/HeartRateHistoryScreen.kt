@@ -13,15 +13,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heartratemonitor.ui.theme.AppColors
+import com.heartratemonitor.ui.components.HeartRateWaveView
 import com.heartratemonitor.viewmodel.HeartRateViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heartratemonitor.data.entity.HeartRateEntity
@@ -320,55 +319,14 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             allHeartRateHistory.takeLast(300).map { it.heartRate }
                         }
 
-                        Canvas(
+                        HeartRateWaveView(
+                            heartRateHistory = recentHrValues,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF1A1A2E))
-                        ) {
-                            val dataCount = recentHrValues.size
-                            if (dataCount < 2) return@Canvas
-
-                            // Y 轴映射：心率 50-220 映射到画布高度
-                            val minHr = 50f
-                            val maxHr = 220f
-                            val hrRange = maxHr - minHr
-                            val padding = 30f // 上下留白
-                            val drawableHeight = size.height - padding * 2
-
-                            // 画背景网格
-                            val gridPaint = androidx.compose.ui.graphics.Paint().apply {
-                                color = Color(0xFF2A2A4A)
-                                strokeWidth = 1f
-                            }
-                            val gridSpacing = 40f
-                            // 横线
-                            var gy = padding
-                            while (gy < size.height - padding) {
-                                drawLine(Color(0xFF2A2A4A), androidx.compose.ui.geometry.Offset(0f, gy), androidx.compose.ui.geometry.Offset(size.width, gy), strokeWidth = 0.5f)
-                                gy += gridSpacing
-                            }
-
-                            // 画心率曲线
-                            val path = Path()
-                            val stepX = size.width / 300f
-                            val startOffset = 300 - dataCount
-
-                            for (i in 0 until dataCount) {
-                                val hr = recentHrValues[i].toFloat()
-                                val normalized = (hr - minHr) / hrRange
-                                val clamped = normalized.coerceIn(0f, 1f)
-                                val x = (startOffset + i) * stepX
-                                val y = padding + drawableHeight * (1f - clamped) // 高心率在上方
-                                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                            }
-
-                            drawPath(
-                                path = path,
-                                color = Color(0xFFEE4000),
-                                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                            )
-                        }
+                                .clip(RoundedCornerShape(8.dp)),
+                            waveColor = Color(0xFFEE4000),
+                            fixedHeight = null
+                        )
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("暂无趋势数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)

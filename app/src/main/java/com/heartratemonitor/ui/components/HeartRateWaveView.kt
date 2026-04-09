@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -35,7 +36,7 @@ fun HeartRateWaveView(
     gridColor: Color = Color(0xFF1a3a1a),
     gridBigColor: Color = Color(0xFF2a5a2a),
     backgroundColor: Color = Color(0xFF0a0a0a),
-    height: Dp = 100.dp
+    fixedHeight: Dp? = 100.dp
 ) {
     // 扫描线动画
     val scanProgress = remember { Animatable(0f) }
@@ -50,9 +51,10 @@ fun HeartRateWaveView(
     }
 
     Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height)
+        modifier = modifier.then(
+            if (fixedHeight != null) Modifier.fillMaxWidth().height(fixedHeight)
+            else Modifier.fillMaxSize()
+        )
     ) {
         drawRect(backgroundColor)
 
