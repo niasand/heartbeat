@@ -521,14 +521,6 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
                     strokeWidth = strokeWidth,
                     cap = StrokeCap.Round
                 )
-                // X 轴
-                drawLine(
-                    color = axisColor,
-                    start = androidx.compose.ui.geometry.Offset(0f, size.height),
-                    end = androidx.compose.ui.geometry.Offset(size.width, size.height),
-                    strokeWidth = strokeWidth,
-                    cap = StrokeCap.Round
-                )
             }
 
             // Y轴刻度标签（绝对定位在左侧）
