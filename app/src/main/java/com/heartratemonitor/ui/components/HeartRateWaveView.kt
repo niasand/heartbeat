@@ -36,7 +36,7 @@ fun HeartRateWaveView(
     yAxisRange: IntRange = 50..200,
 ) {
     val yAxisLabels = yAxisRange.step(50).toList()
-    val labelWidth = 28f // dp reserved for Y-axis labels
+    val labelWidth = 40f // px reserved for Y-axis labels
 
     Canvas(
         modifier = modifier.then(
