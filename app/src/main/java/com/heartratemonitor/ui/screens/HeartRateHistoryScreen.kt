@@ -348,12 +348,6 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                                 drawLine(Color(0xFF2A2A4A), androidx.compose.ui.geometry.Offset(0f, gy), androidx.compose.ui.geometry.Offset(size.width, gy), strokeWidth = 0.5f)
                                 gy += gridSpacing
                             }
-                            // 竖线
-                            var gx = 0f
-                            while (gx < size.width) {
-                                drawLine(Color(0xFF2A2A4A), androidx.compose.ui.geometry.Offset(gx, padding), androidx.compose.ui.geometry.Offset(gx, size.height - padding), strokeWidth = 0.5f)
-                                gx += gridSpacing
-                            }
 
                             // 画心率曲线
                             val path = Path()

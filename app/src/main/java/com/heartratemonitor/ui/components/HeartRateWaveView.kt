@@ -143,14 +143,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(
     val path = Path()
     // 横线
     var y = 0f
-    while (y <= h) {
+    while (y < h) {
         path.moveTo(0f, y)
         path.lineTo(w, y)
         y += gridSize
     }
     // 竖线
     var x = 0f
-    while (x <= w) {
+    while (x < w) {
         path.moveTo(x, 0f)
         path.lineTo(x, h)
         x += gridSize
