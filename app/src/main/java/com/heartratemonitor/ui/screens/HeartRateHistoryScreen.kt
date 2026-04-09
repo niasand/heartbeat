@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,25 +53,27 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
     // 过去12小时心率数据，降采样为 ~120 个点（每 6 分钟一个点）
     val twelveHoursAgo = System.currentTimeMillis() - 12 * 60 * 60 * 1000L
-    val waveHrData = remember(allHeartRateHistory) {
-        val entities = allHeartRateHistory.filter { it.timestamp >= twelveHoursAgo }
-        if (entities.isEmpty()) {
-            emptyList()
-        } else {
-            val bucketCount = 120
-            val minTs = entities.minOf { it.timestamp }
-            val maxTs = entities.maxOf { it.timestamp }
-            val range = (maxTs - minTs).coerceAtLeast(1L)
-            val bucketSize = range / bucketCount
-            (0 until bucketCount).map { i ->
-                val bucketStart = minTs + i * bucketSize
-                val bucketEnd = if (i == bucketCount - 1) maxTs + 1 else bucketStart + bucketSize
-                entities
-                    .filter { it.timestamp in bucketStart until bucketEnd }
-                    .map { it.heartRate }
-                    .average()
-                    .toInt()
-                    .coerceIn(40, 220)
+    val waveHrData by remember {
+        derivedStateOf {
+            val entities = allHeartRateHistory.filter { it.timestamp >= twelveHoursAgo }
+            if (entities.isEmpty()) {
+                emptyList()
+            } else {
+                val bucketCount = 120
+                val minTs = entities.minOf { it.timestamp }
+                val maxTs = entities.maxOf { it.timestamp }
+                val range = (maxTs - minTs).coerceAtLeast(1L)
+                val bucketSize = range / bucketCount
+                (0 until bucketCount).map { i ->
+                    val bucketStart = minTs + i * bucketSize
+                    val bucketEnd = if (i == bucketCount - 1) maxTs + 1 else bucketStart + bucketSize
+                    entities
+                        .filter { it.timestamp in bucketStart until bucketEnd }
+                        .map { it.heartRate }
+                        .average()
+                        .toInt()
+                        .coerceIn(40, 220)
+                }
             }
         }
     }
@@ -176,15 +179,16 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             )
                         }
 
-                        HeartRateWaveView(
-                            heartRateHistory = waveHrData,
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            waveColor = Color(0xFFEE4000),
-                            fixedHeight = null,
-                            showYAxis = true,
-                            dataUpdateKey = allHeartRateHistory.size
-                        )
+                        key(allHeartRateHistory.size) {
+                            HeartRateWaveView(
+                                heartRateHistory = waveHrData,
+                                modifier = Modifier
+                                    .fillMaxSize(),
+                                waveColor = Color(0xFFEE4000),
+                                fixedHeight = null,
+                                showYAxis = true
+                            )
+                        }
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("暂无趋势数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
