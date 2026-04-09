@@ -426,18 +426,6 @@ fun RealTimeHeartRateScreen(
             }
         }
 
-        // 心电图波形曲线
-        HeartRateWaveView(
-            heartRateHistory = heartRateHistory.map { it.heartRate },
-            modifier = Modifier.fillMaxWidth(),
-            waveColor = when {
-                currentHeartRate == null -> Color.Gray.copy(alpha = 0.3f)
-                currentHeartRate!! > highThreshold -> AppColors.HeartRateCritical
-                currentHeartRate!! < lowThreshold -> AppColors.Warning
-                else -> AppColors.HeartRateNormal
-            }
-        )
-
         // 控制按钮
         Row(
             modifier = Modifier.fillMaxWidth(),
