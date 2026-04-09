@@ -153,6 +153,7 @@ fun rememberMarker(): Marker {
 fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     // 1. 获取所有数据（用于图表）
     val allHeartRateHistory by viewModel.heartRateHistory.collectAsState()
+    val currentHr by viewModel.currentHeartRate.collectAsState()
 
     // 2. 获取最近600条数据（用于列表）
     val recentHeartRateHistory = remember(allHeartRateHistory) {
@@ -314,19 +315,27 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             )
                         }
 
-                        // 提取最近 300 个心率值用于波形显示
-                        val recentHrValues = remember(allHeartRateHistory, tick) {
-                            allHeartRateHistory.takeLast(300).map { it.heartRate }
+                        // 提取最近 300 个心率值，加上实时心率确保即时显示
+                        val recentHrValues = remember(allHeartRateHistory, currentHr, tick) {
+                            val history = allHeartRateHistory.takeLast(300).map { it.heartRate }
+                            // 如果当前有实时心率且与最后一条不同，追加到末尾
+                            if (currentHr != null && (history.isEmpty() || history.last() != currentHr)) {
+                                history + currentHr!!
+                            } else {
+                                history
+                            }
                         }
 
-                        HeartRateWaveView(
-                            heartRateHistory = recentHrValues,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp)),
-                            waveColor = Color(0xFFEE4000),
-                            fixedHeight = null
-                        )
+                        key(tick) {
+                            HeartRateWaveView(
+                                heartRateHistory = recentHrValues,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(8.dp)),
+                                waveColor = Color(0xFFEE4000),
+                                fixedHeight = null
+                            )
+                        }
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("暂无趋势数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
