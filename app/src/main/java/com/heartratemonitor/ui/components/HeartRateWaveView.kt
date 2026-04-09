@@ -38,7 +38,7 @@ fun HeartRateWaveView(
 ) {
     val yAxisLabels = yAxisRange.step(50).toList()
     val density = LocalDensity.current
-    val labelWidth = with(density) { 45.dp.toPx() }
+    val labelWidth = with(density) { 40.dp.toPx() }
 
     Canvas(
         modifier = modifier.then(
