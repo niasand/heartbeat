@@ -26,144 +26,20 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heartratemonitor.data.entity.HeartRateEntity
 import com.heartratemonitor.data.dao.DailyHeartRateStats
 
-import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
-import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
-import com.patrykandpatrick.vico.core.axis.AxisItemPlacer
-import com.patrykandpatrick.vico.compose.chart.Chart
-import com.patrykandpatrick.vico.compose.chart.line.lineChart
-import com.patrykandpatrick.vico.core.entry.entryModelOf
-import com.patrykandpatrick.vico.core.entry.FloatEntry
-import com.patrykandpatrick.vico.core.axis.AxisPosition
-import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
 import java.text.SimpleDateFormat
 import java.util.Locale
-
-import com.patrykandpatrick.vico.core.marker.Marker
-import com.patrykandpatrick.vico.compose.component.shapeComponent
-import com.patrykandpatrick.vico.compose.component.textComponent
-import com.patrykandpatrick.vico.core.component.shape.Shapes
-import com.patrykandpatrick.vico.core.component.shape.cornered.Corner
-import com.patrykandpatrick.vico.core.context.MeasureContext
-import com.patrykandpatrick.vico.core.extension.copyColor
-import com.patrykandpatrick.vico.core.marker.MarkerLabelFormatter
-import com.patrykandpatrick.vico.compose.dimensions.dimensionsOf
-import com.patrykandpatrick.vico.core.chart.dimensions.HorizontalDimensions
-import com.patrykandpatrick.vico.core.chart.insets.Insets
-import com.patrykandpatrick.vico.compose.chart.column.columnChart
-import com.patrykandpatrick.vico.core.component.shape.shader.DynamicShaders
-import com.patrykandpatrick.vico.compose.component.shape.shader.fromBrush
-import com.patrykandpatrick.vico.core.chart.values.AxisValuesOverrider
-import com.patrykandpatrick.vico.compose.chart.scroll.rememberChartScrollSpec
-import com.patrykandpatrick.vico.core.scroll.InitialScroll
-import com.patrykandpatrick.vico.core.scroll.AutoScrollCondition
 
 /**
  * 历史心率屏幕 - 简化版本
  */
 @Composable
-fun rememberMarker(): Marker {
-    val label = textComponent(
-        color = MaterialTheme.colorScheme.onSurface,
-        background = shapeComponent(
-            shape = Shapes.pillShape,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            strokeColor = MaterialTheme.colorScheme.outline,
-            strokeWidth = 1.dp,
-        ),
-        padding = dimensionsOf(8.dp, 4.dp),
-        typeface = android.graphics.Typeface.MONOSPACE
-    )
-    val indicator = shapeComponent(
-        shape = Shapes.pillShape,
-        color = MaterialTheme.colorScheme.primary,
-        strokeColor = MaterialTheme.colorScheme.surface,
-        strokeWidth = 2.dp,
-    )
-    val guideline = shapeComponent(
-        shape = Shapes.pillShape,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-    )
-    
-    return remember(label, indicator, guideline) {
-        object : Marker {
-            override fun draw(
-                context: com.patrykandpatrick.vico.core.context.DrawContext,
-                bounds: android.graphics.RectF,
-                markedEntries: List<com.patrykandpatrick.vico.core.marker.Marker.EntryModel>,
-                chartValuesProvider: com.patrykandpatrick.vico.core.chart.values.ChartValuesProvider
-            ) {
-                with(context) {
-                    drawGuideline(context, bounds, markedEntries)
-                    val halfIndicatorSize = 16f / 2f // 8dp equivalent
-                    
-                    markedEntries.forEach { entry ->
-                        val x = entry.location.x
-                        val y = entry.location.y
-                        
-                        indicator.draw(
-                            context,
-                            x - halfIndicatorSize,
-                            y - halfIndicatorSize,
-                            x + halfIndicatorSize,
-                            y + halfIndicatorSize
-                        )
-                        
-                        val labelText = "${entry.entry.y.toInt()} BPM"
-                        val labelWidth = label.getTextBounds(context, labelText).width()
-                        val labelHeight = label.getTextBounds(context, labelText).height()
-                        
-                        // Simple label positioning above the point
-                        val labelX = x - labelWidth / 2
-                        val labelY = y - labelHeight - halfIndicatorSize - 10f
-                        
-                        label.drawText(
-                            context,
-                            labelText,
-                            labelX,
-                            labelY,
-                            maxTextWidth = bounds.width().toInt()
-                        )
-                    }
-                }
-            }
-            
-            private fun drawGuideline(
-                context: com.patrykandpatrick.vico.core.context.DrawContext,
-                bounds: android.graphics.RectF,
-                markedEntries: List<com.patrykandpatrick.vico.core.marker.Marker.EntryModel>,
-            ) {
-                markedEntries
-                    .map { it.location.x }
-                    .toSet()
-                    .forEach { x ->
-                        guideline.draw(
-                            context,
-                            x,
-                            bounds.top,
-                            x,
-                            bounds.bottom,
-                        )
-                    }
-            }
-        }
-    }
-}
-
-@Composable
 fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     // 1. 获取所有数据（用于图表）
     val allHeartRateHistory by viewModel.heartRateHistory.collectAsState()
-    val currentHr by viewModel.currentHeartRate.collectAsState()
 
     // 2. 获取最近600条数据（用于列表）
     val recentHeartRateHistory = remember(allHeartRateHistory) {
         allHeartRateHistory.take(600)
-    }
-
-    // 3. 预过滤最近24小时数据（用于图表），仅在数据变化时计算，避免 tick 触发全量扫描
-    val recentDayData = remember(allHeartRateHistory) {
-        val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
-        allHeartRateHistory.filter { it.timestamp >= oneDayAgo }
     }
 
     val heartRateStats by viewModel.heartRateStats.collectAsState()
@@ -171,56 +47,24 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
     var showDailyStats by remember { mutableStateOf(false) }
 
-    // 每5秒 tick 一次，确保新心率数据及时反映到图表
-    // baseTime 已对齐到分钟边界，不会因 tick 频繁变化而横跳
-    var tick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(5_000L)
-            tick++
-        }
-    }
-
-    // 图表数据：过去24小时，每1分钟一个点（取最大心率），基于预过滤数据确保实时更新
-    // baseTime 对齐到分钟边界，确保 x 坐标在两次 tick 之间不会偏移
-    val (entries, baseTime) = remember(recentDayData, tick) {
-        if (recentDayData.isEmpty()) {
-            Pair(emptyList<FloatEntry>(), 0L)
-        } else {
-            val chartWindowStart = (System.currentTimeMillis() / 60_000L) * 60_000L - 24 * 60 * 60 * 1000L
-            val chartData = recentDayData.filter { it.timestamp >= chartWindowStart }
-            if (chartData.isEmpty()) {
-                Pair(emptyList<FloatEntry>(), 0L)
-            } else {
-                val baseTime = chartWindowStart
-                val interval = 60 * 1000L // 每1分钟一个点
-                val groupedData = chartData.groupBy { (it.timestamp / interval) * interval }
-                val data = groupedData.map { (timestamp, entities) ->
-                    val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
-                    val xValue = ((timestamp - baseTime) / 60000f)
-                    FloatEntry(xValue, maxHeartRate)
-                }.sortedBy { it.x }
-                Pair(data, baseTime)
-            }
-        }
-    }
-
-    // X轴由 Vico 自动计算，填满整个图表宽度
-
-    // 时间范围显示（随 tick 更新 endTime）
-    val timeRangeText = remember(baseTime, tick) {
-        if (baseTime > 0) {
-            val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
-            val startTime = sdf.format(baseTime)
-            val endTime = sdf.format(System.currentTimeMillis())
-            "$startTime - $endTime"
-        } else {
-            ""
-        }
-    }
-
     // 固定标题
-    val chartTitle = "过去24小时心率趋势"
+    val chartTitle = "过去12小时心率趋势"
+
+    // 过去12小时心率数据用于波形显示
+    val twelveHoursAgo = System.currentTimeMillis() - 12 * 60 * 60 * 1000L
+    val waveHrData = remember(allHeartRateHistory) {
+        allHeartRateHistory
+            .filter { it.timestamp >= twelveHoursAgo }
+            .map { it.heartRate }
+    }
+
+    // 波形时间范围文本
+    val waveTimeRange = remember(allHeartRateHistory) {
+        if (waveHrData.isEmpty()) "" else {
+            val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
+            "${sdf.format(twelveHoursAgo)} - ${sdf.format(System.currentTimeMillis())}"
+        }
+    }
 
     // Handle empty data case for stats
     val displayStats = heartRateStats ?: HeartRateViewModel.HeartRateStats(0.0, 0, 0, 0)
@@ -252,7 +96,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
 
         // 折线图卡片
-        if (entries.isNotEmpty() || dailyStats.isNotEmpty()) {
+        if (waveHrData.isNotEmpty() || dailyStats.isNotEmpty()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -304,38 +148,25 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                     if (showDailyStats) {
                         // 每日统计柱状图
                         DailyHeartRateChart(dailyStats = dailyStats)
-                    } else if (entries.isNotEmpty()) {
-                        // 实时心率波形（Canvas 绘制，类似医院监护仪）
-                        if (timeRangeText.isNotEmpty()) {
+                    } else if (waveHrData.isNotEmpty()) {
+                        // 过去12小时心率波形
+                        if (waveTimeRange.isNotEmpty()) {
                             Text(
-                                text = timeRangeText,
+                                text = waveTimeRange,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
                         }
 
-                        // 提取最近 300 个心率值，加上实时心率确保即时显示
-                        val recentHrValues = remember(allHeartRateHistory, currentHr, tick) {
-                            val history = allHeartRateHistory.takeLast(300).map { it.heartRate }
-                            // 如果当前有实时心率且与最后一条不同，追加到末尾
-                            if (currentHr != null && (history.isEmpty() || history.last() != currentHr)) {
-                                history + currentHr!!
-                            } else {
-                                history
-                            }
-                        }
-
-                        key(tick) {
-                            HeartRateWaveView(
-                                heartRateHistory = recentHrValues,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(8.dp)),
-                                waveColor = Color(0xFFEE4000),
-                                fixedHeight = null
-                            )
-                        }
+                        HeartRateWaveView(
+                            heartRateHistory = waveHrData,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp)),
+                            waveColor = Color(0xFFEE4000),
+                            fixedHeight = null
+                        )
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("暂无趋势数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
