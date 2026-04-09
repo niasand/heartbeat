@@ -35,10 +35,11 @@ fun HeartRateWaveView(
     fixedHeight: Dp? = 100.dp,
     showYAxis: Boolean = false,
     yAxisRange: IntRange = 50..200,
+    dataUpdateKey: Any = Unit, // 传 allHeartRateHistory.size 即可强制刷新
 ) {
     val yAxisLabels = yAxisRange.step(50).toList()
     val density = LocalDensity.current
-    val labelWidth = with(density) { 38.dp.toPx() }
+    val labelWidth = with(density) { 40.dp.toPx() }
 
     Canvas(
         modifier = modifier.then(

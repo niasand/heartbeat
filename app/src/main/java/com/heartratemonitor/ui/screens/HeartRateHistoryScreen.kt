@@ -176,18 +176,15 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             )
                         }
 
-                        // allHeartRateHistory.size 作为 key，绕过 Compose 对 List<Int> 的结构相等性跳过
-                        // 即使心率值相同，新数据的 timestamp 不同，size 一定变化
-                        key(allHeartRateHistory.size) {
-                            HeartRateWaveView(
-                                heartRateHistory = waveHrData,
-                                modifier = Modifier
-                                    .fillMaxSize(),
-                                waveColor = Color(0xFFEE4000),
-                                fixedHeight = null,
-                                showYAxis = true
-                            )
-                        }
+                        HeartRateWaveView(
+                            heartRateHistory = waveHrData,
+                            modifier = Modifier
+                                .fillMaxSize(),
+                            waveColor = Color(0xFFEE4000),
+                            fixedHeight = null,
+                            showYAxis = true,
+                            dataUpdateKey = allHeartRateHistory.size
+                        )
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("暂无趋势数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
