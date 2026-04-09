@@ -315,7 +315,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                         }
 
                         // 提取最近 300 个心率值用于波形显示
-                        val recentHrValues = remember(allHeartRateHistory) {
+                        val recentHrValues = remember(allHeartRateHistory, tick) {
                             allHeartRateHistory.takeLast(300).map { it.heartRate }
                         }
 
