@@ -64,6 +64,11 @@ class HeartRateViewModel @Inject constructor(
     private val _hasAutoConnectedDevice = MutableStateFlow(false)
     val hasAutoConnectedDevice: StateFlow<Boolean> = _hasAutoConnectedDevice
 
+    fun resetAutoConnectAttempted() {
+        _hasAutoConnectAttempted.value = false
+        _hasAutoConnectedDevice.value = false
+    }
+
     // 心率声音开关
     @Volatile private var isBeepEnabled = preferencesManager.cachedHeartbeatSoundEnabled
 
@@ -308,6 +313,9 @@ class HeartRateViewModel @Inject constructor(
 
     fun disconnect() {
         bleConnectionManager.disconnect()
+        // 手动断开后重置自动连接标记，下次启动时可以重新尝试
+        _hasAutoConnectAttempted.value = false
+        _hasAutoConnectedDevice.value = false
     }
     
     fun setAutoReconnectEnabled(enabled: Boolean) {

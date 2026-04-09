@@ -323,6 +323,17 @@ fun RealTimeHeartRateScreen(
         }
     }
 
+    // 检测到意外断开时重置自动连接标记，允许重新连接
+    LaunchedEffect(connectionState) {
+        if (connectionState is ConnectionState.DISCONNECTED && hasAutoConnectAttempted && hasAutoConnectedDevice) {
+            // 延迟一下再重试，避免和 BleConnectionManager 内部的自动重连冲突
+            kotlinx.coroutines.delay(3000)
+            if (connectionState is ConnectionState.DISCONNECTED) {
+                viewModel.resetAutoConnectAttempted()
+            }
+        }
+    }
+
     // 自动连接扫描到的第一个设备
     val scannedDevices by viewModel.scannedDevices.collectAsState()
     val scanState by viewModel.scanState.collectAsState()
