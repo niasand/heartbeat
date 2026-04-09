@@ -1,17 +1,10 @@
 package com.heartratemonitor.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -38,18 +31,6 @@ fun HeartRateWaveView(
     backgroundColor: Color = Color(0xFF0a0a0a),
     fixedHeight: Dp? = 100.dp
 ) {
-    // 扫描线动画
-    val scanProgress = remember { Animatable(0f) }
-
-    LaunchedEffect(heartRateHistory.size) {
-        if (heartRateHistory.isNotEmpty()) {
-            scanProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-            )
-        }
-    }
-
     Canvas(
         modifier = modifier.then(
             if (fixedHeight != null) Modifier.fillMaxWidth().height(fixedHeight)
@@ -70,18 +51,19 @@ fun HeartRateWaveView(
 
         // 画波形曲线
         if (heartRateHistory.isNotEmpty()) {
-            val data = heartRateHistory.takeLast(200) // 最多显示最近200个点
+            val data = heartRateHistory
             val maxVal = 220f
             val minVal = 40f
             val range = maxVal - minVal
+            val pointCount = data.size.coerceAtLeast(2)
+            val padding = 4f
 
             val path = Path()
-            val stepX = w / 200f
+            val stepX = (w - padding * 2) / (pointCount - 1)
 
             data.forEachIndexed { index, hr ->
-                val x = index * stepX
+                val x = padding + index * stepX
                 val normalizedHr = (hr - minVal) / range
-                // 心率越高，波形越往下（模拟心电图方向）
                 val y = h * 0.15f + normalizedHr * h * 0.7f
 
                 if (index == 0) {
@@ -105,7 +87,7 @@ fun HeartRateWaveView(
             if (data.size > 1) {
                 val gradientPath = Path()
                 data.forEachIndexed { index, hr ->
-                    val x = index * stepX
+                    val x = padding + index * stepX
                     val normalizedHr = (hr - minVal) / range
                     val y = h * 0.15f + normalizedHr * h * 0.7f
 
@@ -116,8 +98,8 @@ fun HeartRateWaveView(
                     }
                 }
                 // 闭合到底部形成渐变区域
-                gradientPath.lineTo((data.size - 1) * stepX, h)
-                gradientPath.lineTo(0f, h)
+                gradientPath.lineTo(padding + (data.size - 1) * stepX, h)
+                gradientPath.lineTo(padding, h)
                 gradientPath.close()
 
                 drawPath(

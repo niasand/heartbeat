@@ -50,17 +50,34 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     // 固定标题
     val chartTitle = "过去12小时心率趋势"
 
-    // 过去12小时心率数据用于波形显示
+    // 过去12小时心率数据，降采样为 ~120 个点（每 6 分钟一个点）
     val twelveHoursAgo = System.currentTimeMillis() - 12 * 60 * 60 * 1000L
     val waveHrData = remember(allHeartRateHistory) {
-        allHeartRateHistory
-            .filter { it.timestamp >= twelveHoursAgo }
-            .map { it.heartRate }
+        val entities = allHeartRateHistory.filter { it.timestamp >= twelveHoursAgo }
+        if (entities.isEmpty()) {
+            emptyList()
+        } else {
+            val bucketCount = 120
+            val minTs = entities.minOf { it.timestamp }
+            val maxTs = entities.maxOf { it.timestamp }
+            val range = (maxTs - minTs).coerceAtLeast(1L)
+            val bucketSize = range / bucketCount
+            (0 until bucketCount).map { i ->
+                val bucketStart = minTs + i * bucketSize
+                val bucketEnd = if (i == bucketCount - 1) maxTs + 1 else bucketStart + bucketSize
+                entities
+                    .filter { it.timestamp in bucketStart until bucketEnd }
+                    .map { it.heartRate }
+                    .average()
+                    .toInt()
+                    .coerceIn(40, 220)
+            }
+        }
     }
 
     // 波形时间范围文本
     val waveTimeRange = remember(allHeartRateHistory) {
-        if (waveHrData.isEmpty()) "" else {
+        if (allHeartRateHistory.isEmpty()) "" else {
             val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
             "${sdf.format(twelveHoursAgo)} - ${sdf.format(System.currentTimeMillis())}"
         }
