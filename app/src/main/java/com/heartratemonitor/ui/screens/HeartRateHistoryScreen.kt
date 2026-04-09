@@ -185,7 +185,8 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(8.dp)),
                                 waveColor = Color(0xFFEE4000),
-                                fixedHeight = null
+                                fixedHeight = null,
+                                showYAxis = true
                             )
                         }
                     } else {
