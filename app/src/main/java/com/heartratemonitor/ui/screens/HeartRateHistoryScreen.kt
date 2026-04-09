@@ -182,8 +182,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             HeartRateWaveView(
                                 heartRateHistory = waveHrData,
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(8.dp)),
+                                    .fillMaxSize(),
                                 waveColor = Color(0xFFEE4000),
                                 fixedHeight = null,
                                 showYAxis = true

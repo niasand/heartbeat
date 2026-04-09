@@ -76,7 +76,7 @@ fun HeartRateWaveView(
             }
             yAxisLabels.forEach { hr ->
                 val normalized = (hr - minVal) / range
-                val y = topPad + normalized * chartHeight
+                val y = bottomPad - normalized * chartHeight
                 // 参考线
                 drawLine(
                     color = Color.White.copy(alpha = 0.12f),
@@ -102,7 +102,7 @@ fun HeartRateWaveView(
             data.forEachIndexed { index, hr ->
                 val x = leftPad + index * stepX
                 val normalizedHr = (hr - minVal) / range
-                val y = topPad + normalizedHr * chartHeight
+                val y = bottomPad - normalizedHr * chartHeight
 
                 if (index == 0) {
                     path.moveTo(x, y)
