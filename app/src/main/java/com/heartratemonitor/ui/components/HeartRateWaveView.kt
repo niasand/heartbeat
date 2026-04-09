@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 
 /**
@@ -36,7 +37,8 @@ fun HeartRateWaveView(
     yAxisRange: IntRange = 50..200,
 ) {
     val yAxisLabels = yAxisRange.step(50).toList()
-    val labelWidth = 40f // px reserved for Y-axis labels
+    val density = LocalDensity.current
+    val labelWidth = with(density) { 36.dp.toPx() }
 
     Canvas(
         modifier = modifier.then(
