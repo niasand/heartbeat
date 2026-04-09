@@ -37,6 +37,9 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     // 1. 获取所有数据（用于图表）
     val allHeartRateHistory by viewModel.heartRateHistory.collectAsState()
 
+    // 严格递增版本号，每次保存心率时 +1
+    val dataVersion by viewModel.dataVersion.collectAsState()
+
     // 2. 获取最近600条数据（用于列表）
     val recentHeartRateHistory = remember(allHeartRateHistory) {
         allHeartRateHistory.take(600)
@@ -51,34 +54,29 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     val chartTitle = "过去12小时心率趋势"
 
     // 过去12小时心率数据，降采样为 ~120 个点（每 6 分钟一个点）
-    // 用 mutableState + snapshotFlow 确保数据变化时 Canvas 一定重绘
+    // 用 dataVersion 驱动重新计算，确保每次心率保存都触发更新
     val twelveHoursAgo = System.currentTimeMillis() - 12 * 60 * 60 * 1000L
-    val waveHrData = remember { mutableStateOf(emptyList<Int>()) }
-
-    LaunchedEffect(Unit) {
-        snapshotFlow { allHeartRateHistory.toList() }
-            .collect { history ->
-                val entities = history.filter { it.timestamp >= twelveHoursAgo }
-                waveHrData.value = if (entities.isEmpty()) {
-                    emptyList()
-                } else {
-                    val bucketCount = 120
-                    val minTs = entities.minOf { it.timestamp }
-                    val maxTs = entities.maxOf { it.timestamp }
-                    val range = (maxTs - minTs).coerceAtLeast(1L)
-                    val bucketSize = range / bucketCount
-                    (0 until bucketCount).map { i ->
-                        val bucketStart = minTs + i * bucketSize
-                        val bucketEnd = if (i == bucketCount - 1) maxTs + 1 else bucketStart + bucketSize
-                        entities
-                            .filter { it.timestamp in bucketStart until bucketEnd }
-                            .map { it.heartRate }
-                            .average()
-                            .toInt()
-                            .coerceIn(40, 220)
-                    }
-                }
+    val waveHrData = remember(dataVersion) {
+        val entities = allHeartRateHistory.filter { it.timestamp >= twelveHoursAgo }
+        if (entities.isEmpty()) {
+            emptyList()
+        } else {
+            val bucketCount = 120
+            val minTs = entities.minOf { it.timestamp }
+            val maxTs = entities.maxOf { it.timestamp }
+            val range = (maxTs - minTs).coerceAtLeast(1L)
+            val bucketSize = range / bucketCount
+            (0 until bucketCount).map { i ->
+                val bucketStart = minTs + i * bucketSize
+                val bucketEnd = if (i == bucketCount - 1) maxTs + 1 else bucketStart + bucketSize
+                entities
+                    .filter { it.timestamp in bucketStart until bucketEnd }
+                    .map { it.heartRate }
+                    .average()
+                    .toInt()
+                    .coerceIn(40, 220)
             }
+        }
     }
 
     // 波形时间范围文本
@@ -119,7 +117,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
 
         // 折线图卡片
-        if (waveHrData.value.isNotEmpty() || dailyStats.isNotEmpty()) {
+        if (waveHrData.isNotEmpty() || dailyStats.isNotEmpty()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -171,7 +169,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                     if (showDailyStats) {
                         // 每日统计柱状图
                         DailyHeartRateChart(dailyStats = dailyStats)
-                    } else if (waveHrData.value.isNotEmpty()) {
+                    } else if (waveHrData.isNotEmpty()) {
                         // 过去12小时心率波形
                         if (waveTimeRange.isNotEmpty()) {
                             Text(
@@ -182,14 +180,16 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             )
                         }
 
-                        HeartRateWaveView(
-                            heartRateHistory = waveHrData.value,
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            waveColor = Color(0xFFEE4000),
-                            fixedHeight = null,
-                            showYAxis = true
-                        )
+                        key(dataVersion) {
+                            HeartRateWaveView(
+                                heartRateHistory = waveHrData,
+                                modifier = Modifier
+                                    .fillMaxSize(),
+                                waveColor = Color(0xFFEE4000),
+                                fixedHeight = null,
+                                showYAxis = true
+                            )
+                        }
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("暂无趋势数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)

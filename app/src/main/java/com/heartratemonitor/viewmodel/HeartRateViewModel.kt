@@ -54,6 +54,10 @@ class HeartRateViewModel @Inject constructor(
     private val _currentHeartRate = MutableStateFlow<Int?>(null)
     val currentHeartRate: StateFlow<Int?> = _currentHeartRate
 
+    // 严格递增的数据版本号，每次保存心率时 +1，用于强制 UI 刷新
+    private val _dataVersion = MutableStateFlow(0)
+    val dataVersion: StateFlow<Int> = _dataVersion
+
     // 跟踪是否已尝试自动连接（跨 Activity 切换不丢失）
     private val _hasAutoConnectAttempted = MutableStateFlow(false)
     val hasAutoConnectAttempted: StateFlow<Boolean> = _hasAutoConnectAttempted
@@ -328,6 +332,7 @@ class HeartRateViewModel @Inject constructor(
         }
 
         _currentHeartRate.value = heartRate
+        _dataVersion.value++
 
         // 保存到数据库
         viewModelScope.launch {
