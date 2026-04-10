@@ -54,9 +54,9 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     val chartTitle = "过去12小时心率趋势"
 
     // 过去12小时心率数据，降采样为 ~120 个点（每 6 分钟一个点）
-    // 用 dataVersion 驱动重新计算，确保每次心率保存都触发更新
+    // 用 dataVersion + allHeartRateHistory 双重驱动，解决 dataVersion 先于数据库 Flow 更新的竞态问题
     val twelveHoursAgo = System.currentTimeMillis() - 12 * 60 * 60 * 1000L
-    val waveHrData = remember(dataVersion) {
+    val waveHrData = remember(dataVersion, allHeartRateHistory) {
         val entities = allHeartRateHistory.filter { it.timestamp >= twelveHoursAgo }
         if (entities.isEmpty()) {
             emptyList()
@@ -180,16 +180,14 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             )
                         }
 
-                        key(dataVersion) {
-                            HeartRateWaveView(
-                                heartRateHistory = waveHrData,
-                                modifier = Modifier
-                                    .fillMaxSize(),
-                                waveColor = Color(0xFFEE4000),
-                                fixedHeight = null,
-                                showYAxis = true
-                            )
-                        }
+                        HeartRateWaveView(
+                            heartRateHistory = waveHrData,
+                            modifier = Modifier
+                                .fillMaxSize(),
+                            waveColor = Color(0xFFEE4000),
+                            fixedHeight = null,
+                            showYAxis = true
+                        )
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("暂无趋势数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
