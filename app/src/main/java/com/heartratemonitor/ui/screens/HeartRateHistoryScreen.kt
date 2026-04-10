@@ -51,39 +51,21 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     var showDailyStats by remember { mutableStateOf(false) }
 
     // 固定标题
-    val chartTitle = "过去12小时心率趋势"
+    val chartTitle = "实时心率趋势"
 
-    // 过去12小时心率数据，降采样为 ~120 个点（每 6 分钟一个点）
-    // 用 dataVersion + allHeartRateHistory 双重驱动，解决 dataVersion 先于数据库 Flow 更新的竞态问题
-    val twelveHoursAgo = System.currentTimeMillis() - 12 * 60 * 60 * 1000L
+    // 取最近 300 条原始心率数据点（约最近 5 分钟），每条新数据都能让曲线可见地移动
     val waveHrData = remember(dataVersion, allHeartRateHistory) {
-        val entities = allHeartRateHistory.filter { it.timestamp >= twelveHoursAgo }
-        if (entities.isEmpty()) {
-            emptyList()
-        } else {
-            val bucketCount = 120
-            val minTs = entities.minOf { it.timestamp }
-            val maxTs = entities.maxOf { it.timestamp }
-            val range = (maxTs - minTs).coerceAtLeast(1L)
-            val bucketSize = range / bucketCount
-            (0 until bucketCount).map { i ->
-                val bucketStart = minTs + i * bucketSize
-                val bucketEnd = if (i == bucketCount - 1) maxTs + 1 else bucketStart + bucketSize
-                entities
-                    .filter { it.timestamp in bucketStart until bucketEnd }
-                    .map { it.heartRate }
-                    .average()
-                    .toInt()
-                    .coerceIn(40, 220)
-            }
-        }
+        allHeartRateHistory
+            .takeLast(300)
+            .map { it.heartRate.coerceIn(40, 220) }
     }
 
     // 波形时间范围文本
     val waveTimeRange = remember(allHeartRateHistory) {
-        if (allHeartRateHistory.isEmpty()) "" else {
+        val last300 = allHeartRateHistory.takeLast(300)
+        if (last300.isEmpty()) "" else {
             val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
-            "${sdf.format(twelveHoursAgo)} - ${sdf.format(System.currentTimeMillis())}"
+            "${sdf.format(last300.first().timestamp)} - ${sdf.format(last300.last().timestamp)}"
         }
     }
 
