@@ -1,192 +1,208 @@
 package com.heartratemonitor.ui.components
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import android.content.Context
+import android.graphics.*
+import android.view.View
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 
 /**
- * 心电图风格心率曲线（Compose 版）
- * 参考 WaveProject 实现，适配 Jetpack Compose
+ * 心电图风格心率曲线（AndroidView 版，原生 View.onDraw 保证每次数据变化都能重绘）
  */
 @Composable
 fun HeartRateWaveView(
     heartRateHistory: List<Int>,
     modifier: Modifier = Modifier,
-    waveColor: Color = Color(0xFFEE4000),
-    gridColor: Color = Color(0xFF1a3a1a),
-    gridBigColor: Color = Color(0xFF2a5a2a),
-    backgroundColor: Color = Color(0xFF0a0a0a),
-    fixedHeight: Dp? = 100.dp,
+    waveColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color(0xFFEE4000),
+    gridColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color(0xFF1a3a1a),
+    gridBigColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color(0xFF2a5a2a),
+    backgroundColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color(0xFF0a0a0a),
+    fixedHeight: Dp? = null,
     showYAxis: Boolean = false,
     yAxisRange: IntRange = 50..200,
 ) {
     val yAxisLabels = yAxisRange.step(50).toList()
     val density = LocalDensity.current
-    val labelWidth = with(density) { 40.dp.toPx() }
+    val labelWidthPx = with(density) { (if (showYAxis) 40.dp else 0.dp).toPx() }
 
-    // 用 rememberUpdatedState 桥接为快照状态，确保 Canvas draw scope 内的状态读取
-    // 能被 Compose snapshot 系统追踪到变化并触发重绘
-    val currentData by rememberUpdatedState(heartRateHistory)
+    // 将 Compose 颜色转为 Int，避免在 View 内重复转换
+    val waveColorInt = waveColor.toArgb()
+    val gridColorInt = gridColor.toArgb()
+    val gridBigColorInt = gridBigColor.toArgb()
+    val bgColorInt = backgroundColor.toArgb()
 
-    Canvas(
-        modifier = modifier.then(
-            if (fixedHeight != null) Modifier.fillMaxWidth().height(fixedHeight)
-            else Modifier.fillMaxSize()
-        )
+    AndroidView(
+        factory = { ctx ->
+            WaveChartView(ctx).apply {
+                setWillNotDraw(false)
+            }
+        },
+        update = { view ->
+            view.setData(
+                data = heartRateHistory,
+                yAxisLabels = yAxisLabels,
+                showYAxis = showYAxis,
+                labelWidthPx = labelWidthPx,
+                waveColor = waveColorInt,
+                gridColor = gridColorInt,
+                gridBigColor = gridBigColorInt,
+                bgColor = bgColorInt,
+            )
+        },
+        modifier = modifier
+    )
+}
+
+private class WaveChartView(context: Context) : View(context) {
+
+    private var data: List<Int> = emptyList()
+    private var yAxisLabels: List<Int> = emptyList()
+    private var showYAxis: Boolean = false
+    private var labelWidthPx: Float = 0f
+    private var waveColor: Int = Color.RED
+    private var gridColor: Int = Color.GREEN
+    private var gridBigColor: Int = Color.GREEN
+    private var bgColor: Int = Color.BLACK
+
+    // Pre-allocated paints
+    private val bgPaint = Paint()
+    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val gridBigPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        strokeWidth = 2f
+    }
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val refLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 0.5f
+    }
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 24f
+        typeface = Typeface.DEFAULT
+        textAlign = Paint.Align.RIGHT
+    }
+
+    fun setData(
+        data: List<Int>,
+        yAxisLabels: List<Int>,
+        showYAxis: Boolean,
+        labelWidthPx: Float,
+        waveColor: Int,
+        gridColor: Int,
+        gridBigColor: Int,
+        bgColor: Int,
     ) {
-        drawRect(backgroundColor)
+        this.data = data
+        this.yAxisLabels = yAxisLabels
+        this.showYAxis = showYAxis
+        this.labelWidthPx = labelWidthPx
+        this.waveColor = waveColor
+        this.gridColor = gridColor
+        this.gridBigColor = gridBigColor
+        this.bgColor = bgColor
+        invalidate() // Force redraw
+    }
 
-        val w = size.width
-        val h = size.height
-        val gridSmall = 10f
-        val gridBig = 50f
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
 
-        // 画小网格
-        drawGrid(w, h, gridSmall, gridColor, 1f)
-        // 画大网格
-        drawGrid(w, h, gridBig, gridBigColor, 1f)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (w <= 0f || h <= 0f) return
 
-        // Y 轴参数（与波形映射一致）
+        // Background
+        bgPaint.color = bgColor
+        canvas.drawRect(0f, 0f, w, h, bgPaint)
+
+        // Grid
+        drawGrid(canvas, w, h, 10f, gridColor)
+        drawGrid(canvas, w, h, 50f, gridBigColor)
+
+        // Wave parameters
         val minVal = 40f
         val maxVal = 220f
         val range = maxVal - minVal
-        val topPad = h * 0.15f   // HR=220 对应的 Y
-        val bottomPad = h * 0.85f // HR=40 对应的 Y
+        val topPad = h * 0.15f
+        val bottomPad = h * 0.85f
         val chartHeight = bottomPad - topPad
+        val leftPad = labelWidthPx
+        val rightPad = 4f
 
-        // 画 Y 轴刻度和参考线
+        // Y axis
         if (showYAxis) {
-            val nativeCanvas = drawContext.canvas.nativeCanvas
-            val textPaint = android.graphics.Paint().apply {
-                color = android.graphics.Color.argb(128, 255, 255, 255)
-                textSize = 24f
-                typeface = android.graphics.Typeface.DEFAULT
-                isAntiAlias = true
-                textAlign = android.graphics.Paint.Align.RIGHT
-            }
+            textPaint.color = Color.argb(128, 255, 255, 255)
+            refLinePaint.color = Color.argb(30, 255, 255, 255)
             yAxisLabels.forEach { hr ->
                 val normalized = (hr - minVal) / range
                 val y = bottomPad - normalized * chartHeight
-                // 参考线
-                drawLine(
-                    color = Color.White.copy(alpha = 0.12f),
-                    start = Offset(labelWidth, y),
-                    end = Offset(w, y),
-                    strokeWidth = 0.5f
-                )
-                // 刻度文字（基线对齐到参考线）
-                nativeCanvas.drawText("$hr", labelWidth - 4f, y + 8f, textPaint)
+                canvas.drawLine(leftPad, y, w, y, refLinePaint)
+                canvas.drawText("$hr", leftPad - 4f, y + 8f, textPaint)
             }
         }
 
-        // 画波形曲线
-        if (currentData.isNotEmpty()) {
-            val data = currentData
+        // Wave curve
+        if (data.isNotEmpty()) {
             val pointCount = data.size.coerceAtLeast(2)
-            val leftPad = if (showYAxis) labelWidth else 4f
-            val rightPad = 4f
+            val stepX = if (pointCount > 1) (w - leftPad - rightPad) / (pointCount - 1) else 0f
 
-            val path = Path()
-            val stepX = (w - leftPad - rightPad) / (pointCount - 1)
-
+            // Main curve
+            val wavePath = Path()
             data.forEachIndexed { index, hr ->
                 val x = leftPad + index * stepX
                 val normalizedHr = (hr - minVal) / range
                 val y = bottomPad - normalizedHr * chartHeight
-
-                if (index == 0) {
-                    path.moveTo(x, y)
-                } else {
-                    path.lineTo(x, y)
-                }
+                if (index == 0) wavePath.moveTo(x, y) else wavePath.lineTo(x, y)
             }
+            wavePaint.color = waveColor
+            canvas.drawPath(wavePath, wavePaint)
 
-            drawPath(
-                path = path,
-                color = waveColor,
-                style = Stroke(
-                    width = 2f,
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round
-                )
-            )
-
-            // 波形发光效果（半透明渐变）
+            // Glow gradient
             if (data.size > 1) {
-                val gradientPath = Path()
+                val glowPath = Path()
                 data.forEachIndexed { index, hr ->
                     val x = leftPad + index * stepX
                     val normalizedHr = (hr - minVal) / range
                     val y = bottomPad - normalizedHr * chartHeight
-
-                    if (index == 0) {
-                        gradientPath.moveTo(x, y)
-                    } else {
-                        gradientPath.lineTo(x, y)
-                    }
+                    if (index == 0) glowPath.moveTo(x, y) else glowPath.lineTo(x, y)
                 }
-                gradientPath.lineTo(leftPad + (data.size - 1) * stepX, h)
-                gradientPath.lineTo(leftPad, h)
-                gradientPath.close()
+                glowPath.lineTo(leftPad + (data.size - 1) * stepX, h)
+                glowPath.lineTo(leftPad, h)
+                glowPath.close()
 
-                drawPath(
-                    path = gradientPath,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            waveColor.copy(alpha = 0.15f),
-                            waveColor.copy(alpha = 0.02f),
-                            Color.Transparent
-                        )
-                    )
-                )
+                val glowShader = LinearGradient(0f, topPad, 0f, h, intArrayOf(
+                    Color.argb(38, Color.red(waveColor), Color.green(waveColor), Color.blue(waveColor)),
+                    Color.argb(5, Color.red(waveColor), Color.green(waveColor), Color.blue(waveColor)),
+                    Color.TRANSPARENT
+                ), null, Shader.TileMode.CLAMP)
+                glowPaint.shader = glowShader
+                canvas.drawPath(glowPath, glowPaint)
+                glowPaint.shader = null
             }
         }
     }
-}
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGrid(
-    w: Float,
-    h: Float,
-    gridSize: Float,
-    color: Color,
-    strokeWidth: Float
-) {
-    val path = Path()
-    // 横线
-    var y = 0f
-    while (y < h) {
-        path.moveTo(0f, y)
-        path.lineTo(w, y)
-        y += gridSize
+    private fun drawGrid(canvas: Canvas, w: Float, h: Float, gridSize: Float, color: Int) {
+        gridPaint.color = color
+        gridPaint.strokeWidth = 1f
+        var y = 0f
+        while (y < h) {
+            canvas.drawLine(0f, y, w, y, gridPaint)
+            y += gridSize
+        }
+        var x = 0f
+        while (x < w) {
+            canvas.drawLine(x, 0f, x, h, gridPaint)
+            x += gridSize
+        }
     }
-    // 竖线
-    var x = 0f
-    while (x < w) {
-        path.moveTo(x, 0f)
-        path.lineTo(x, h)
-        x += gridSize
-    }
-    drawPath(
-        path = path,
-        color = color,
-        style = Stroke(width = strokeWidth)
-    )
 }
