@@ -297,14 +297,14 @@ private class WaveChartView(context: Context) : View(context) {
                 canvas.drawCircle(lastX, lastY, 5f, indicatorDotPaint)
                 canvas.drawCircle(lastX, lastY, 7f, indicatorRingPaint)
 
-                // Value label: "65"
+                // Value label: "65" — always above the dot
                 val labelText = "$lastHr"
                 bubbleTextPaint.textSize = 32f
                 val labelWidth = bubbleTextPaint.measureText(labelText)
                 val lbW = labelWidth + 20f
                 val lbH = 38f
-                val lbX = (lastX - lbW - 8f).coerceIn(leftPad, w - rightPad - lbW)
-                val lbY = (lastY - lbH / 2f).coerceIn(topPad, h - lbH - 4f)
+                val lbX = (lastX - lbW / 2f).coerceIn(leftPad, w - rightPad - lbW)
+                val lbY = (lastY - lbH - 12f).coerceAtLeast(topPad)
 
                 val lbRect = RectF(lbX, lbY, lbX + lbW, lbY + lbH)
                 canvas.drawRoundRect(lbRect, 6f, 6f, bubblePaint)
