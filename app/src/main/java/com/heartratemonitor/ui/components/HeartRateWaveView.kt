@@ -137,9 +137,18 @@ private class WaveChartView(context: Context) : View(context) {
 
     init {
         gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onLongPress(e: MotionEvent) { /* consume */ }
+            override fun onLongPress(e: MotionEvent) {
+                handleTouch(e.x)
+            }
             override fun onDown(e: MotionEvent): Boolean {
                 handleTouch(e.x)
+                return true
+            }
+            override fun onScroll(
+                e1: MotionEvent?, e2: MotionEvent,
+                dx: Float, dy: Float
+            ): Boolean {
+                if (selectedIndex >= 0) handleTouch(e2.x)
                 return true
             }
             override fun onSingleTapUp(e: MotionEvent): Boolean {
