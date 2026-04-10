@@ -199,7 +199,7 @@ private class WaveChartView(context: Context) : View(context) {
         gridBigColor: Int,
         bgColor: Int,
     ) {
-        this.data = data
+        this.data = data.reversed() // 反转使 index 0=最旧(左), index N=最新(右)
         this.yAxisLabels = yAxisLabels
         this.showYAxis = showYAxis
         this.labelWidthPx = labelWidthPx
@@ -284,6 +284,32 @@ private class WaveChartView(context: Context) : View(context) {
                 glowPaint.shader = glowShader
                 canvas.drawPath(glowPath, glowPaint)
                 glowPaint.shader = null
+            }
+
+            // Latest value indicator (rightmost point = newest data)
+            if (data.isNotEmpty()) {
+                val lastHr = data.last()
+                val lastX = w - rightPad
+                val normalizedHr = (lastHr - minVal) / range
+                val lastY = bottomPad - normalizedHr * chartHeight
+
+                // Dot
+                canvas.drawCircle(lastX, lastY, 5f, indicatorDotPaint)
+                canvas.drawCircle(lastX, lastY, 7f, indicatorRingPaint)
+
+                // Value label: "65"
+                val labelText = "$lastHr"
+                bubbleTextPaint.textSize = 32f
+                val labelWidth = bubbleTextPaint.measureText(labelText)
+                val lbW = labelWidth + 20f
+                val lbH = 38f
+                val lbX = (lastX - lbW - 8f).coerceIn(leftPad, w - rightPad - lbW)
+                val lbY = (lastY - lbH / 2f).coerceIn(topPad, h - lbH - 4f)
+
+                val lbRect = RectF(lbX, lbY, lbX + lbW, lbY + lbH)
+                canvas.drawRoundRect(lbRect, 6f, 6f, bubblePaint)
+                canvas.drawRoundRect(lbRect, 6f, 6f, bubbleStrokePaint)
+                canvas.drawText(labelText, lbRect.centerX(), lbRect.centerY() + 11f, bubbleTextPaint)
             }
 
             // Long press indicator

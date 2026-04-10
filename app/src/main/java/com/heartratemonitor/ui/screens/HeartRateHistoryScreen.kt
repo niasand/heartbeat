@@ -60,12 +60,12 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
             .map { it.heartRate.coerceIn(40, 220) }
     }
 
-    // 波形时间范围文本（DESC 排列：first=最新, last=最旧）
+    // 波形时间范围文本（DESC 排列：first=最新, last=最旧；显示为 旧→新）
     val waveTimeRange = remember(allHeartRateHistory) {
         val last300 = allHeartRateHistory.take(300)
         if (last300.isEmpty()) "" else {
             val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
-            "${sdf.format(last300.last().timestamp)} - ${sdf.format(last300.first().timestamp)}"
+            "${sdf.format(last300.last().timestamp)} → ${sdf.format(last300.first().timestamp)}"
         }
     }
 
