@@ -162,14 +162,6 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                             )
                         }
 
-                        // DEBUG: 显示数据变化情况
-                        Text(
-                            text = "pts=${waveHrData.size} last=${waveHrData.lastOrNull()} ver=$dataVersion hist=${allHeartRateHistory.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(bottom = 2.dp)
-                        )
-
                         HeartRateWaveView(
                             heartRateHistory = waveHrData,
                             modifier = Modifier
