@@ -53,19 +53,19 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     // 固定标题
     val chartTitle = "实时心率趋势"
 
-    // 取最近 300 条原始心率数据点（约最近 5 分钟），每条新数据都能让曲线可见地移动
+    // 取最近 300 条原始心率数据点（列表已按 timestamp DESC 排列，take 即最新数据）
     val waveHrData = remember(dataVersion, allHeartRateHistory) {
         allHeartRateHistory
-            .takeLast(300)
+            .take(300)
             .map { it.heartRate.coerceIn(40, 220) }
     }
 
-    // 波形时间范围文本
+    // 波形时间范围文本（DESC 排列：first=最新, last=最旧）
     val waveTimeRange = remember(allHeartRateHistory) {
-        val last300 = allHeartRateHistory.takeLast(300)
+        val last300 = allHeartRateHistory.take(300)
         if (last300.isEmpty()) "" else {
             val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
-            "${sdf.format(last300.first().timestamp)} - ${sdf.format(last300.last().timestamp)}"
+            "${sdf.format(last300.last().timestamp)} - ${sdf.format(last300.first().timestamp)}"
         }
     }
 
