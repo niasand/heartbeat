@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -39,6 +41,10 @@ fun HeartRateWaveView(
     val yAxisLabels = yAxisRange.step(50).toList()
     val density = LocalDensity.current
     val labelWidth = with(density) { 40.dp.toPx() }
+
+    // 用 rememberUpdatedState 桥接为快照状态，确保 Canvas draw scope 内的状态读取
+    // 能被 Compose snapshot 系统追踪到变化并触发重绘
+    val currentData by rememberUpdatedState(heartRateHistory)
 
     Canvas(
         modifier = modifier.then(
@@ -92,8 +98,8 @@ fun HeartRateWaveView(
         }
 
         // 画波形曲线
-        if (heartRateHistory.isNotEmpty()) {
-            val data = heartRateHistory
+        if (currentData.isNotEmpty()) {
+            val data = currentData
             val pointCount = data.size.coerceAtLeast(2)
             val leftPad = if (showYAxis) labelWidth else 4f
             val rightPad = 4f
