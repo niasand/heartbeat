@@ -2,6 +2,10 @@ package com.heartratemonitor.ui.components
 
 import android.content.Context
 import android.graphics.*
+import android.os.Handler
+import android.os.Looper
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -69,6 +73,14 @@ private class WaveChartView(context: Context) : View(context) {
     private var gridBigColor: Int = Color.GREEN
     private var bgColor: Int = Color.BLACK
 
+    // Long press indicator
+    private var selectedX: Float = -1f
+    private var selectedIndex: Int = -1
+    private val autoHideHandler = Handler(Looper.getMainLooper())
+    private val autoHideRunnable = Runnable { clearSelection() }
+
+    private val gestureDetector: GestureDetector
+
     // Pre-allocated paints
     private val bgPaint = Paint()
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -90,6 +102,91 @@ private class WaveChartView(context: Context) : View(context) {
         textSize = 24f
         typeface = Typeface.DEFAULT
         textAlign = Paint.Align.RIGHT
+    }
+    // Indicator paints
+    private val indicatorLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+        color = Color.argb(180, 255, 255, 255)
+        setPathEffect(DashPathEffect(floatArrayOf(6f, 4f), 0f))
+    }
+    private val indicatorDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.WHITE
+    }
+    private val indicatorRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+        color = waveColor
+    }
+    private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(220, 30, 30, 30)
+        style = Paint.Style.FILL
+    }
+    private val bubbleStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(180, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+    }
+    private val bubbleTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 28f
+        typeface = Typeface.DEFAULT_BOLD
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+    }
+
+    init {
+        gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onLongPress(e: MotionEvent) { /* consume */ }
+            override fun onDown(e: MotionEvent): Boolean {
+                handleTouch(e.x)
+                return true
+            }
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                handleTouch(e.x)
+                scheduleAutoHide()
+                return true
+            }
+        })
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        gestureDetector.onTouchEvent(event)
+        when (event.action) {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> scheduleAutoHide()
+        }
+        return true
+    }
+
+    private fun handleTouch(touchX: Float) {
+        if (data.isEmpty()) return
+        val w = width.toFloat()
+        val leftPad = labelWidthPx
+        val rightPad = 4f
+        val pointCount = data.size.coerceAtLeast(2)
+        val stepX = (w - leftPad - rightPad) / (pointCount - 1)
+
+        val index = ((touchX - leftPad) / stepX).toInt()
+            .coerceIn(0, data.lastIndex)
+        val snappedX = leftPad + index * stepX
+
+        if (index != selectedIndex || touchX != selectedX) {
+            selectedIndex = index
+            selectedX = snappedX
+            autoHideHandler.removeCallbacks(autoHideRunnable)
+            invalidate()
+        }
+    }
+
+    private fun scheduleAutoHide() {
+        autoHideHandler.removeCallbacks(autoHideRunnable)
+        autoHideHandler.postDelayed(autoHideRunnable, 2000)
+    }
+
+    private fun clearSelection() {
+        selectedIndex = -1
+        selectedX = -1f
+        invalidate()
     }
 
     fun setData(
@@ -187,6 +284,37 @@ private class WaveChartView(context: Context) : View(context) {
                 glowPaint.shader = glowShader
                 canvas.drawPath(glowPath, glowPaint)
                 glowPaint.shader = null
+            }
+
+            // Long press indicator
+            if (selectedIndex in data.indices && selectedX >= 0f) {
+                val hr = data[selectedIndex]
+                val normalizedHr = (hr - minVal) / range
+                val dotY = bottomPad - normalizedHr * chartHeight
+
+                // Vertical dashed line
+                canvas.drawLine(selectedX, topPad, selectedX, h, indicatorLinePaint)
+
+                // Dot on the curve
+                canvas.drawCircle(selectedX, dotY, 6f, indicatorDotPaint)
+                canvas.drawCircle(selectedX, dotY, 8f, indicatorRingPaint)
+
+                // Bubble: "65 BPM"
+                val label = "$hr BPM"
+                bubbleTextPaint.textSize = 28f
+                val textWidth = bubbleTextPaint.measureText(label)
+                val bubbleW = textWidth + 24f
+                val bubbleH = 40f
+                val bubbleX = (selectedX - bubbleW / 2f).coerceIn(leftPad, w - rightPad - bubbleW)
+                val bubbleY = dotY - bubbleH - 16f
+
+                // Rounded rect background
+                val bubbleRect = RectF(bubbleX, bubbleY, bubbleX + bubbleW, bubbleY + bubbleH)
+                canvas.drawRoundRect(bubbleRect, 8f, 8f, bubblePaint)
+                canvas.drawRoundRect(bubbleRect, 8f, 8f, bubbleStrokePaint)
+
+                // Text
+                canvas.drawText(label, bubbleRect.centerX(), bubbleRect.centerY() + 10f, bubbleTextPaint)
             }
         }
     }
