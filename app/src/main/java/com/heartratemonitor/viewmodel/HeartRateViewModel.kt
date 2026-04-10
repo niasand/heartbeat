@@ -54,6 +54,21 @@ class HeartRateViewModel @Inject constructor(
     private val _currentHeartRate = MutableStateFlow<Int?>(null)
     val currentHeartRate: StateFlow<Int?> = _currentHeartRate
 
+    // 严格递增的数据版本号，每次保存心率时 +1，用于强制 UI 刷新
+    private val _dataVersion = MutableStateFlow(0)
+    val dataVersion: StateFlow<Int> = _dataVersion
+
+    // 跟踪是否已尝试自动连接（跨 Activity 切换不丢失）
+    private val _hasAutoConnectAttempted = MutableStateFlow(false)
+    val hasAutoConnectAttempted: StateFlow<Boolean> = _hasAutoConnectAttempted
+    private val _hasAutoConnectedDevice = MutableStateFlow(false)
+    val hasAutoConnectedDevice: StateFlow<Boolean> = _hasAutoConnectedDevice
+
+    fun resetAutoConnectAttempted() {
+        _hasAutoConnectAttempted.value = false
+        _hasAutoConnectedDevice.value = false
+    }
+
     // 心率声音开关
     @Volatile private var isBeepEnabled = preferencesManager.cachedHeartbeatSoundEnabled
 
@@ -265,6 +280,14 @@ class HeartRateViewModel @Inject constructor(
         bleScanner.startScan()
     }
 
+    fun markAutoConnectAttempted() {
+        _hasAutoConnectAttempted.value = true
+    }
+
+    fun markAutoConnectedDevice() {
+        _hasAutoConnectedDevice.value = true
+    }
+
     fun stopScan() {
         bleScanner.stopScan()
     }
@@ -290,6 +313,9 @@ class HeartRateViewModel @Inject constructor(
 
     fun disconnect() {
         bleConnectionManager.disconnect()
+        // 手动断开后重置自动连接标记，下次启动时可以重新尝试
+        _hasAutoConnectAttempted.value = false
+        _hasAutoConnectedDevice.value = false
     }
     
     fun setAutoReconnectEnabled(enabled: Boolean) {
@@ -314,6 +340,7 @@ class HeartRateViewModel @Inject constructor(
         }
 
         _currentHeartRate.value = heartRate
+        _dataVersion.value++
 
         // 保存到数据库
         viewModelScope.launch {

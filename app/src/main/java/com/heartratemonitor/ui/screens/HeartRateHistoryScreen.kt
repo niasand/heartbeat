@@ -14,155 +14,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heartratemonitor.ui.theme.AppColors
+import com.heartratemonitor.ui.components.HeartRateWaveView
 import com.heartratemonitor.viewmodel.HeartRateViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heartratemonitor.data.entity.HeartRateEntity
 import com.heartratemonitor.data.dao.DailyHeartRateStats
 
-import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
-import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
-import com.patrykandpatrick.vico.core.axis.AxisItemPlacer
-import com.patrykandpatrick.vico.compose.chart.Chart
-import com.patrykandpatrick.vico.compose.chart.line.lineChart
-import com.patrykandpatrick.vico.core.entry.entryModelOf
-import com.patrykandpatrick.vico.core.entry.FloatEntry
-import com.patrykandpatrick.vico.core.axis.AxisPosition
-import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
 import java.text.SimpleDateFormat
 import java.util.Locale
-
-import com.patrykandpatrick.vico.core.marker.Marker
-import com.patrykandpatrick.vico.compose.component.shapeComponent
-import com.patrykandpatrick.vico.compose.component.textComponent
-import com.patrykandpatrick.vico.core.component.shape.Shapes
-import com.patrykandpatrick.vico.core.component.shape.cornered.Corner
-import com.patrykandpatrick.vico.core.context.MeasureContext
-import com.patrykandpatrick.vico.core.extension.copyColor
-import com.patrykandpatrick.vico.core.marker.MarkerLabelFormatter
-import com.patrykandpatrick.vico.compose.dimensions.dimensionsOf
-import com.patrykandpatrick.vico.core.chart.dimensions.HorizontalDimensions
-import com.patrykandpatrick.vico.core.chart.insets.Insets
-import com.patrykandpatrick.vico.compose.chart.column.columnChart
-import com.patrykandpatrick.vico.core.component.shape.shader.DynamicShaders
-import com.patrykandpatrick.vico.compose.component.shape.shader.fromBrush
-import com.patrykandpatrick.vico.core.chart.values.AxisValuesOverrider
-import com.patrykandpatrick.vico.compose.chart.scroll.rememberChartScrollSpec
-import com.patrykandpatrick.vico.core.scroll.InitialScroll
-import com.patrykandpatrick.vico.core.scroll.AutoScrollCondition
 
 /**
  * 历史心率屏幕 - 简化版本
  */
 @Composable
-fun rememberMarker(): Marker {
-    val label = textComponent(
-        color = MaterialTheme.colorScheme.onSurface,
-        background = shapeComponent(
-            shape = Shapes.pillShape,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            strokeColor = MaterialTheme.colorScheme.outline,
-            strokeWidth = 1.dp,
-        ),
-        padding = dimensionsOf(8.dp, 4.dp),
-        typeface = android.graphics.Typeface.MONOSPACE
-    )
-    val indicator = shapeComponent(
-        shape = Shapes.pillShape,
-        color = MaterialTheme.colorScheme.primary,
-        strokeColor = MaterialTheme.colorScheme.surface,
-        strokeWidth = 2.dp,
-    )
-    val guideline = shapeComponent(
-        shape = Shapes.pillShape,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-    )
-    
-    return remember(label, indicator, guideline) {
-        object : Marker {
-            override fun draw(
-                context: com.patrykandpatrick.vico.core.context.DrawContext,
-                bounds: android.graphics.RectF,
-                markedEntries: List<com.patrykandpatrick.vico.core.marker.Marker.EntryModel>,
-                chartValuesProvider: com.patrykandpatrick.vico.core.chart.values.ChartValuesProvider
-            ) {
-                with(context) {
-                    drawGuideline(context, bounds, markedEntries)
-                    val halfIndicatorSize = 16f / 2f // 8dp equivalent
-                    
-                    markedEntries.forEach { entry ->
-                        val x = entry.location.x
-                        val y = entry.location.y
-                        
-                        indicator.draw(
-                            context,
-                            x - halfIndicatorSize,
-                            y - halfIndicatorSize,
-                            x + halfIndicatorSize,
-                            y + halfIndicatorSize
-                        )
-                        
-                        val labelText = "${entry.entry.y.toInt()} BPM"
-                        val labelWidth = label.getTextBounds(context, labelText).width()
-                        val labelHeight = label.getTextBounds(context, labelText).height()
-                        
-                        // Simple label positioning above the point
-                        val labelX = x - labelWidth / 2
-                        val labelY = y - labelHeight - halfIndicatorSize - 10f
-                        
-                        label.drawText(
-                            context,
-                            labelText,
-                            labelX,
-                            labelY,
-                            maxTextWidth = bounds.width().toInt()
-                        )
-                    }
-                }
-            }
-            
-            private fun drawGuideline(
-                context: com.patrykandpatrick.vico.core.context.DrawContext,
-                bounds: android.graphics.RectF,
-                markedEntries: List<com.patrykandpatrick.vico.core.marker.Marker.EntryModel>,
-            ) {
-                markedEntries
-                    .map { it.location.x }
-                    .toSet()
-                    .forEach { x ->
-                        guideline.draw(
-                            context,
-                            x,
-                            bounds.top,
-                            x,
-                            bounds.bottom,
-                        )
-                    }
-            }
-        }
-    }
-}
-
-@Composable
 fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
     // 1. 获取所有数据（用于图表）
     val allHeartRateHistory by viewModel.heartRateHistory.collectAsState()
 
+    // 严格递增版本号，每次保存心率时 +1
+    val dataVersion by viewModel.dataVersion.collectAsState()
+
     // 2. 获取最近600条数据（用于列表）
     val recentHeartRateHistory = remember(allHeartRateHistory) {
         allHeartRateHistory.take(600)
-    }
-
-    // 3. 预过滤最近24小时数据（用于图表），仅在数据变化时计算，避免 tick 触发全量扫描
-    val recentDayData = remember(allHeartRateHistory) {
-        val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
-        allHeartRateHistory.filter { it.timestamp >= oneDayAgo }
     }
 
     val heartRateStats by viewModel.heartRateStats.collectAsState()
@@ -170,54 +50,24 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
 
     var showDailyStats by remember { mutableStateOf(false) }
 
-    // 每分钟 tick 一次，确保图表窗口始终跟随当前时间
-    var tick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(3_000L)
-            tick++
-        }
-    }
-
-    // 图表数据：过去24小时，每1分钟一个点（取最大心率），基于预过滤数据确保实时更新
-    val (entries, baseTime) = remember(recentDayData, tick) {
-        if (recentDayData.isEmpty()) {
-            Pair(emptyList<FloatEntry>(), 0L)
-        } else {
-            val chartWindowStart = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
-            val chartData = recentDayData.filter { it.timestamp >= chartWindowStart }
-            if (chartData.isEmpty()) {
-                Pair(emptyList<FloatEntry>(), 0L)
-            } else {
-                val baseTime = chartWindowStart
-                val interval = 60 * 1000L // 每1分钟一个点
-                val groupedData = chartData.groupBy { (it.timestamp / interval) * interval }
-                val data = groupedData.map { (timestamp, entities) ->
-                    val maxHeartRate = entities.maxOf { it.heartRate }.toFloat()
-                    val xValue = ((timestamp - baseTime) / 60000f)
-                    FloatEntry(xValue, maxHeartRate)
-                }.sortedBy { it.x }
-                Pair(data, baseTime)
-            }
-        }
-    }
-
-    // X轴由 Vico 自动计算，填满整个图表宽度
-
-    // 时间范围显示（随 tick 更新 endTime）
-    val timeRangeText = remember(baseTime, tick) {
-        if (baseTime > 0) {
-            val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
-            val startTime = sdf.format(baseTime)
-            val endTime = sdf.format(System.currentTimeMillis())
-            "$startTime - $endTime"
-        } else {
-            ""
-        }
-    }
-
     // 固定标题
-    val chartTitle = "过去24小时心率趋势"
+    val chartTitle = "实时心率趋势"
+
+    // 取最近 300 条原始心率数据点（列表已按 timestamp DESC 排列，take 即最新数据）
+    val waveHrData = remember(dataVersion, allHeartRateHistory) {
+        allHeartRateHistory
+            .take(300)
+            .map { it.heartRate.coerceIn(40, 220) }
+    }
+
+    // 波形时间范围文本（DESC 排列：first=最新, last=最旧；显示为 旧→新）
+    val waveTimeRange = remember(allHeartRateHistory) {
+        val last300 = allHeartRateHistory.take(300)
+        if (last300.isEmpty()) "" else {
+            val sdf = SimpleDateFormat("HH:mm", Locale.CHINA)
+            "${sdf.format(last300.last().timestamp)} → ${sdf.format(last300.first().timestamp)}"
+        }
+    }
 
     // Handle empty data case for stats
     val displayStats = heartRateStats ?: HeartRateViewModel.HeartRateStats(0.0, 0, 0, 0)
@@ -249,7 +99,7 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
         }
 
         // 折线图卡片
-        if (entries.isNotEmpty() || dailyStats.isNotEmpty()) {
+        if (waveHrData.isNotEmpty() || dailyStats.isNotEmpty()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -301,51 +151,24 @@ fun HeartRateHistoryScreen(viewModel: HeartRateViewModel = viewModel()) {
                     if (showDailyStats) {
                         // 每日统计柱状图
                         DailyHeartRateChart(dailyStats = dailyStats)
-                    } else if (entries.isNotEmpty()) {
-                        // 实时趋势折线图
-                        if (timeRangeText.isNotEmpty()) {
+                    } else if (waveHrData.isNotEmpty()) {
+                        // 过去12小时心率波形
+                        if (waveTimeRange.isNotEmpty()) {
                             Text(
-                                text = timeRangeText,
+                                text = waveTimeRange,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
                         }
 
-                        val chartEntryModel = entryModelOf(entries)
-                        val marker = rememberMarker()
-                        val chartScrollSpec = rememberChartScrollSpec(
-                            initialScroll = InitialScroll.End,
-                            autoScrollCondition = object : AutoScrollCondition<com.patrykandpatrick.vico.core.entry.ChartEntryModel> {
-                                override fun shouldPerformAutoScroll(
-                                    newModel: com.patrykandpatrick.vico.core.entry.ChartEntryModel,
-                                    oldModel: com.patrykandpatrick.vico.core.entry.ChartEntryModel?
-                                ): Boolean = true
-                            }
-                        )
-                        Chart(
-                            chart = lineChart(
-                                spacing = 0.1.dp,
-                                axisValuesOverrider = AxisValuesOverrider.fixed(
-                                    minY = 70f,
-                                    maxY = 200f
-                                ),
-                                lines = listOf(
-                                    com.patrykandpatrick.vico.core.chart.line.LineChart.LineSpec(
-                                        lineColor = android.graphics.Color.RED
-                                    )
-                                )
-                            ),
-                            model = chartEntryModel,
-                            chartScrollSpec = chartScrollSpec,
-                            startAxis = rememberStartAxis(
-                                itemPlacer = AxisItemPlacer.Vertical.default(maxItemCount = 6),
-                                valueFormatter = { value, _ ->
-                                    value.toInt().toString()
-                                }
-                            ),
-                            marker = marker,
-                            modifier = Modifier.fillMaxSize()
+                        HeartRateWaveView(
+                            heartRateHistory = waveHrData,
+                            modifier = Modifier
+                                .fillMaxSize(),
+                            waveColor = Color(0xFFEE4000),
+                            fixedHeight = null,
+                            showYAxis = true
                         )
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -496,14 +319,6 @@ private fun DailyHeartRateChart(dailyStats: List<DailyHeartRateStats>) {
                     color = axisColor,
                     start = androidx.compose.ui.geometry.Offset(0f, 0f),
                     end = androidx.compose.ui.geometry.Offset(0f, size.height),
-                    strokeWidth = strokeWidth,
-                    cap = StrokeCap.Round
-                )
-                // X 轴
-                drawLine(
-                    color = axisColor,
-                    start = androidx.compose.ui.geometry.Offset(0f, size.height),
-                    end = androidx.compose.ui.geometry.Offset(size.width, size.height),
                     strokeWidth = strokeWidth,
                     cap = StrokeCap.Round
                 )
