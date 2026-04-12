@@ -255,19 +255,11 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
                     }
                     OutlinedTextField(
                         value = apiKeyInput,
-                        onValueChange = { apiKeyInput = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { state ->
-                                if (state.isFocused) {
-                                    // focused
-                                } else {
-                                    val key = currentApiKey
-                                    if (apiKeyInput != key) {
-                                        viewModel.saveSiliconFlowApiKey(apiKeyInput.trim())
-                                    }
-                                }
-                            },
+                        onValueChange = {
+                            apiKeyInput = it
+                            viewModel.saveSiliconFlowApiKey(it.trim())
+                        },
+                        modifier = Modifier.fillMaxWidth(),
                         label = { Text("API Key") },
                         singleLine = true,
                         placeholder = { Text("sk-...") }
