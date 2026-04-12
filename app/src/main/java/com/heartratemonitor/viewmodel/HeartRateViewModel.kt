@@ -301,19 +301,27 @@ class HeartRateViewModel @Inject constructor(
     fun connectToDevice(address: String) {
         viewModelScope.launch {
             bleScanner.stopScan()
-            
+
             // 保存设备地址
             preferencesManager.saveLastDeviceAddress(address)
-            
-            // Start the service to ensure it runs in the background
-            val intent = Intent(context, BleHeartRateService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-            
+
             bleConnectionManager.connectToDevice(address)
+        }
+    }
+
+    // 连接成功后启动前台服务（避免在连接过程中弹通知把其他 Activity 顶掉）
+    init {
+        viewModelScope.launch {
+            bleConnectionManager.connectionState.collect { state ->
+                if (state is ConnectionState.CONNECTED) {
+                    val intent = Intent(context, BleHeartRateService::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
+                }
+            }
         }
     }
 
