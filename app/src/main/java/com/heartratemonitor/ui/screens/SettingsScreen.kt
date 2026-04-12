@@ -239,10 +239,10 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
             )
 
             // 硅基流动 API Key 设置卡片
-            SettingsCard(title = "AI 语音解析") {
+            SettingsCard(title = "AI 解析") {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "语音输入倒计时时，使用 AI 解析事件名和时长。配置硅基流动 API Key 以启用此功能。",
+                        text = "智能计时输入事件和时间后，使用 AI 解析事件名和时长。配置硅基流动 API Key 以启用此功能。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
