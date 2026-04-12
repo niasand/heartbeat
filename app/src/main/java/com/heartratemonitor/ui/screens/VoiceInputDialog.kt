@@ -35,9 +35,8 @@ data class VoiceInputResult(
 private enum class DialogPhase {
     READY,           // Waiting for user to tap mic
     LISTENING,       // SpeechRecognizer is active
-    RECOGNIZED,      // Got speech text, waiting for user to confirm
-    PARSING,         // Calling LLM API
-    PARSE_FAILED     // LLM parse failed
+    PARSING,         // Calling LLM API (auto-triggered after recognition)
+    PARSE_FAILED     // LLM parse failed, user can retry
 }
 
 /**
@@ -95,8 +94,23 @@ fun VoiceInputDialog(
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
                     recognizedText = matches[0]
-                    phase = DialogPhase.RECOGNIZED
                     errorMessage = null
+                    // Auto-parse: skip confirmation, call LLM directly
+                    if (apiKey.isBlank()) {
+                        phase = DialogPhase.PARSE_FAILED
+                        errorMessage = "请先在设置中配置 AI 语音解析的 API Key"
+                        return
+                    }
+                    phase = DialogPhase.PARSING
+                    scope.launch {
+                        val result = VoiceCommandParser.parse(apiKey, recognizedText)
+                        if (result != null) {
+                            onResult(result)
+                        } else {
+                            phase = DialogPhase.PARSE_FAILED
+                            errorMessage = context.getString(R.string.voice_error_parse_failed)
+                        }
+                    }
                 } else {
                     phase = DialogPhase.READY
                     errorMessage = context.getString(R.string.voice_error_no_match)
@@ -139,24 +153,6 @@ fun VoiceInputDialog(
 
     fun stopListening() {
         speechRecognizer?.stopListening()
-    }
-
-    fun confirmAndParse() {
-        if (apiKey.isBlank()) {
-            errorMessage = "请先在设置中配置 AI 语音解析的 API Key"
-            return
-        }
-        phase = DialogPhase.PARSING
-        errorMessage = null
-        scope.launch {
-            val result = VoiceCommandParser.parse(apiKey, recognizedText)
-            if (result != null) {
-                onResult(result)
-            } else {
-                phase = DialogPhase.PARSE_FAILED
-                errorMessage = context.getString(R.string.voice_error_parse_failed)
-            }
-        }
     }
 
     AlertDialog(
@@ -285,21 +281,12 @@ fun VoiceInputDialog(
                 }
             }
         },
-        confirmButton = {
-            if (phase == DialogPhase.RECOGNIZED) {
-                TextButton(onClick = { confirmAndParse() }) {
-                    Text(stringResource(R.string.voice_confirm))
-                }
-            }
-        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = {
                 when (phase) {
                     DialogPhase.PARSING -> {} // Ignore taps during parsing
-                    DialogPhase.RECOGNIZED -> {
-                        speechRecognizer?.cancel()
-                        onDismiss()
-                    }
+                    DialogPhase.PARSE_FAILED -> startListening()
                     else -> {
                         speechRecognizer?.cancel()
                         onDismiss()
