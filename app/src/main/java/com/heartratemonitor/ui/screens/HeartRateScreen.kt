@@ -669,17 +669,11 @@ fun CountdownTimerCard(
     }
 
     // 智能计时按钮
-    OutlinedButton(
+    Button(
         onClick = onShowVoiceDialog,
         modifier = Modifier.fillMaxWidth(),
         enabled = !state.isRunning
     ) {
-        Icon(
-            imageVector = Icons.Default.Mic,
-            contentDescription = "智能计时",
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
         Text("智能计时", fontSize = 14.sp)
     }
     }
