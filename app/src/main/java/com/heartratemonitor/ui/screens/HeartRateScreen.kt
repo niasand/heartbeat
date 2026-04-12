@@ -47,9 +47,7 @@ import android.os.Build
 import android.Manifest
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-
 import com.heartratemonitor.ble.BleScanner
-import com.heartratemonitor.ui.components.HeartRateWaveView
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
@@ -63,7 +61,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.outlined.Notifications
 import com.google.accompanist.permissions.rememberPermissionState
-import com.google.accompanist.permissions.PermissionStatus
 
 /**
  * 主屏幕 - 心率监测
@@ -290,19 +287,8 @@ fun RealTimeHeartRateScreen(
         }
     )
 
-    // 语音输入权限和状态
-    @OptIn(ExperimentalPermissionsApi::class)
-    val audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
+    // 智能计时对话框状态
     var showVoiceInputDialog by remember { mutableStateOf(false) }
-    var pendingVoiceDialog by remember { mutableStateOf(false) }
-
-    // 权限授予后自动打开语音对话框
-    LaunchedEffect(audioPermissionState.status) {
-        if (audioPermissionState.status is PermissionStatus.Granted && pendingVoiceDialog) {
-            pendingVoiceDialog = false
-            showVoiceInputDialog = true
-        }
-    }
 
     // Track previous state to avoid showing toast when switching tabs
     var previousState by remember { mutableStateOf(connectionState) }
@@ -483,15 +469,7 @@ fun RealTimeHeartRateScreen(
         // 倒计时
         CountdownTimerCard(
             state = timerState,
-            onShowVoiceDialog = {
-                if (audioPermissionState.status is PermissionStatus.Granted) {
-                    showVoiceInputDialog = true
-                } else {
-                    pendingVoiceDialog = true
-                    audioPermissionState.launchPermissionRequest()
-                }
-            },
-            isSpeechAvailable = isSpeechRecognitionAvailable()
+            onShowVoiceDialog = { showVoiceInputDialog = true }
         )
     }
 
@@ -565,8 +543,7 @@ fun RealTimeHeartRateScreen(
 @Composable
 fun CountdownTimerCard(
     state: TimerState,
-    onShowVoiceDialog: () -> Unit,
-    isSpeechAvailable: Boolean
+    onShowVoiceDialog: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Card(
@@ -691,21 +668,19 @@ fun CountdownTimerCard(
         }
     }
 
-    // 语音输入按钮
-    if (isSpeechAvailable) {
-        OutlinedButton(
-            onClick = onShowVoiceDialog,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isRunning
-        ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = stringResource(R.string.voice_input),
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.voice_input), fontSize = 14.sp)
-        }
+    // 智能计时按钮
+    OutlinedButton(
+        onClick = onShowVoiceDialog,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !state.isRunning
+    ) {
+        Icon(
+            imageVector = Icons.Default.Mic,
+            contentDescription = "智能计时",
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("智能计时", fontSize = 14.sp)
     }
     }
 }
