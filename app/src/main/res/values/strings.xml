@@ -18,4 +18,18 @@
     <string name="threshold_low">低心率阈值</string>
     <string name="theme_color">主题颜色</string>
     <string name="save">保存</string>
+
+    <!-- Smart timer -->
+    <string name="voice_input">智能计时</string>
+    <string name="voice_input_hint">点击麦克风开始说话，例如：煎牛排，倒计时7分钟</string>
+    <string name="voice_listening">正在聆听…</string>
+    <string name="voice_confirm">确认</string>
+    <string name="voice_cancel">取消</string>
+    <string name="voice_retry">重试</string>
+    <string name="voice_error_no_speech">未检测到输入，请重试</string>
+    <string name="voice_error_no_match">无法识别内容，请重试</string>
+    <string name="voice_error_permission">需要麦克风权限</string>
+    <string name="voice_error_parse_failed">无法从输入中提取时间，请重试</string>
+    <string name="voice_parse_success">已设置: %1$s, %2$d分%3$d秒</string>
+    <string name="voice_unsupported">此设备不支持语音识别</string>
 </resources>

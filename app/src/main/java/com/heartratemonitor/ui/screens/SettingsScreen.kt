@@ -87,6 +87,7 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
     val lowThreshold by viewModel.lowThreshold.collectAsState()
     val themeColor by viewModel.themeColor.collectAsState()
     val savedSoundUri by viewModel.timerSoundUri.collectAsState()
+    val siliconFlowApiKey by viewModel.siliconFlowApiKey.collectAsState()
     val heartbeatSoundEnabled by viewModel.heartbeatSoundEnabled.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
@@ -236,6 +237,35 @@ fun SettingsScreen(finishCallback: () -> Unit, viewModel: HeartRateViewModel) {
                 context = context,
                 onSaveSound = { uri -> viewModel.saveTimerSoundUri(uri.toString()) }
             )
+
+            // 硅基流动 API Key 设置卡片
+            SettingsCard(title = "AI 解析") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "智能计时输入事件和时间后，使用 AI 解析事件名和时长。配置硅基流动 API Key 以启用此功能。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    var apiKeyInput by remember { mutableStateOf(siliconFlowApiKey ?: "") }
+                    val currentApiKey = siliconFlowApiKey
+                    LaunchedEffect(currentApiKey) {
+                        if (apiKeyInput.isEmpty() && !currentApiKey.isNullOrEmpty()) {
+                            apiKeyInput = currentApiKey
+                        }
+                    }
+                    OutlinedTextField(
+                        value = apiKeyInput,
+                        onValueChange = {
+                            apiKeyInput = it
+                            viewModel.saveSiliconFlowApiKey(it.trim())
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("API Key") },
+                        singleLine = true,
+                        placeholder = { Text("sk-...") }
+                    )
+                }
+            }
 
             // 数据同步卡片
             DataSyncCard(
