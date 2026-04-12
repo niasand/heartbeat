@@ -60,7 +60,10 @@ import dagger.hilt.android.EntryPointAccessors
 import com.heartratemonitor.di.PreferencesEntryPoint
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.outlined.Notifications
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.PermissionStatus
 
 /**
  * 主屏幕 - 心率监测
@@ -84,6 +87,9 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
     var timerInputSeconds by remember { mutableStateOf("40") }
     var timerTagInput by remember { mutableStateOf("平板支撑") }
     var timerHasPlayed by remember { mutableStateOf(false) }
+
+    // 读取硅基流动 API Key
+    val siliconFlowApiKey by viewModel.siliconFlowApiKey.collectAsState()
 
     // 读取铃声偏好
     val preferencesManager = remember {
@@ -218,7 +224,8 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
                         onInputMinutesChange = { timerInputMinutes = it },
                         onInputSecondsChange = { timerInputSeconds = it },
                         onTagInputChange = { timerTagInput = it }
-                    )
+                    ),
+                    siliconFlowApiKey ?: ""
                 )
                 1 -> HeartRateHistoryScreen(viewModel)
                 2 -> TimerHistoryScreen(viewModel)
@@ -254,7 +261,8 @@ fun RealTimeHeartRateScreen(
     viewModel: HeartRateViewModel = viewModel(),
     connectAttemptId: Int,
     onConnectAttemptIdChange: (Int) -> Unit = {},
-    timerState: TimerState
+    timerState: TimerState,
+    siliconFlowApiKey: String = ""
 ) {
     val context = LocalContext.current
     val currentHeartRate by viewModel.currentHeartRate.collectAsState()
@@ -281,6 +289,20 @@ fun RealTimeHeartRateScreen(
             }
         }
     )
+
+    // 语音输入权限和状态
+    @OptIn(ExperimentalPermissionsApi::class)
+    val audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
+    var showVoiceInputDialog by remember { mutableStateOf(false) }
+    var pendingVoiceDialog by remember { mutableStateOf(false) }
+
+    // 权限授予后自动打开语音对话框
+    LaunchedEffect(audioPermissionState.status) {
+        if (audioPermissionState.status is PermissionStatus.Granted && pendingVoiceDialog) {
+            pendingVoiceDialog = false
+            showVoiceInputDialog = true
+        }
+    }
 
     // Track previous state to avoid showing toast when switching tabs
     var previousState by remember { mutableStateOf(connectionState) }
@@ -459,7 +481,18 @@ fun RealTimeHeartRateScreen(
         }
 
         // 倒计时
-        CountdownTimerCard(timerState)
+        CountdownTimerCard(
+            state = timerState,
+            onShowVoiceDialog = {
+                if (audioPermissionState.status is PermissionStatus.Granted) {
+                    showVoiceInputDialog = true
+                } else {
+                    pendingVoiceDialog = true
+                    audioPermissionState.launchPermissionRequest()
+                }
+            },
+            isSpeechAvailable = isSpeechRecognitionAvailable()
+        )
     }
 
     // 设备选择对话框
@@ -495,6 +528,33 @@ fun RealTimeHeartRateScreen(
             viewModel.disconnect()
         }
     }
+
+    // 语音输入对话框
+    if (showVoiceInputDialog) {
+        VoiceInputDialog(
+            apiKey = siliconFlowApiKey ?: "",
+            onDismiss = { showVoiceInputDialog = false },
+            onResult = { result ->
+                showVoiceInputDialog = false
+                result?.let { voiceResult ->
+                    timerState.onTagInputChange(voiceResult.eventName)
+                    timerState.onInputMinutesChange(voiceResult.minutes.toString())
+                    timerState.onInputSecondsChange(voiceResult.seconds.toString())
+                    val total = voiceResult.minutes * 60 + voiceResult.seconds
+                    if (total > 0) {
+                        timerState.onTotalSecondsChange(total)
+                        timerState.onRemainingSecondsChange(total)
+                        timerState.onIsRunningChange(true)
+                    }
+                    Toast.makeText(
+                        context,
+                        "已设置: ${voiceResult.eventName}, ${voiceResult.minutes}分${voiceResult.seconds}秒",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        )
+    }
 }
 
 /**
@@ -503,7 +563,11 @@ fun RealTimeHeartRateScreen(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CountdownTimerCard(state: TimerState) {
+fun CountdownTimerCard(
+    state: TimerState,
+    onShowVoiceDialog: () -> Unit,
+    isSpeechAvailable: Boolean
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -624,6 +688,23 @@ fun CountdownTimerCard(state: TimerState) {
                     }
                 )
             }
+        }
+    }
+
+    // 语音输入按钮
+    if (isSpeechAvailable) {
+        OutlinedButton(
+            onClick = onShowVoiceDialog,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isRunning
+        ) {
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = stringResource(R.string.voice_input),
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.voice_input), fontSize = 14.sp)
         }
     }
     }

@@ -92,7 +92,7 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
             Text("日期", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f))
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Text(
-                    text = if (currentTagFilter.isNullOrBlank()) "计时类型" else "计时类型($currentTagFilter)",
+                    text = if (currentTagFilter.isNullOrBlank()) "计时事件" else "计时事件($currentTagFilter)",
                     fontSize = 12.sp,
                     fontWeight = if (currentTagFilter != null) FontWeight.Bold else FontWeight.Normal,
                     color = if (currentTagFilter != null) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),

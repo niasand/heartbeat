@@ -129,6 +129,12 @@ class HeartRateViewModel @Inject constructor(
         null
     )
 
+    val siliconFlowApiKey: StateFlow<String?> = preferencesManager.siliconFlowApiKeyFlow.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        null
+    )
+
     val timerSessionHistory: StateFlow<List<TimerSessionEntity>> = timerSessionRepository.getAllSessions().stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
@@ -440,6 +446,15 @@ class HeartRateViewModel @Inject constructor(
     fun saveTimerSoundUri(value: String) {
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             preferencesManager.saveTimerSoundUri(value)
+        }
+    }
+
+    /**
+     * 保存硅基流动 API Key
+     */
+    fun saveSiliconFlowApiKey(value: String) {
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            preferencesManager.saveSiliconFlowApiKey(value)
         }
     }
 

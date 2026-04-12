@@ -62,6 +62,8 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         private val LAST_SYNC_TIME_KEY = longPreferencesKey("last_sync_time")
         // 心率声音开关
         private val HEARTBEAT_SOUND_KEY = booleanPreferencesKey("heartbeat_sound_enabled")
+        // 硅基流动 API Key（用于语音计时解析）
+        private val SILICONFLOW_API_KEY = stringPreferencesKey("siliconflow_api_key")
 
         // 默认值
         const val DEFAULT_HIGH_THRESHOLD = 180
@@ -117,6 +119,13 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
      */
     val heartbeatSoundEnabledFlow: Flow<Boolean> = dataStore.data.map { preferences ->
         preferences[HEARTBEAT_SOUND_KEY] ?: DEFAULT_HEARTBEAT_SOUND_ENABLED
+    }
+
+    /**
+     * 获取硅基流动 API Key
+     */
+    val siliconFlowApiKeyFlow: Flow<String?> = dataStore.data.map { preferences ->
+        preferences[SILICONFLOW_API_KEY]
     }
 
     init {
@@ -197,6 +206,15 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     suspend fun saveHeartbeatSoundEnabled(value: Boolean) {
         dataStore.edit { preferences ->
             preferences[HEARTBEAT_SOUND_KEY] = value
+        }
+    }
+
+    /**
+     * 保存硅基流动 API Key
+     */
+    suspend fun saveSiliconFlowApiKey(value: String) {
+        dataStore.edit { preferences ->
+            preferences[SILICONFLOW_API_KEY] = value
         }
     }
 }
