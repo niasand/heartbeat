@@ -378,7 +378,26 @@ class TimerCountdownService : Service() {
             }
             Log.d(TAG, "Completion sound playing")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to play completion sound", e)
+            Log.e(TAG, "Custom sound failed, falling back to default", e)
+            try {
+                mediaPlayer?.apply {
+                    reset()
+                    setDataSource(
+                        this@TimerCountdownService,
+                        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    )
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    prepare()
+                    start()
+                }
+            } catch (e2: Exception) {
+                Log.e(TAG, "Default sound also failed", e2)
+            }
         }
     }
 
