@@ -282,8 +282,10 @@ class HeartRateViewModel @Inject constructor(
         // Load timer sessions filtered by time range (tag filter applied via combine above)
         viewModelScope.launch {
             _timerFilterDays.collect { days ->
+                android.util.Log.d("TimerVM", "Filter changed to $days days, querying sessions after ${System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000}")
                 val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
                 timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
+                    android.util.Log.d("TimerVM", "Received ${sessions.size} sessions from Room")
                     _sessionsInTimeRange.value = sessions
                 }
             }

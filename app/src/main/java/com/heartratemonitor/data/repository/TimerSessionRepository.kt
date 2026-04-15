@@ -1,5 +1,6 @@
 package com.heartratemonitor.data.repository
 
+import android.util.Log
 import com.heartratemonitor.data.dao.DateCountPair
 import com.heartratemonitor.data.dao.TimerSessionDao
 import com.heartratemonitor.data.entity.TimerSessionEntity
@@ -12,13 +13,14 @@ class TimerSessionRepository @Inject constructor(
     private val timerSessionDao: TimerSessionDao
 ) {
     suspend fun saveSession(durationSeconds: Int, tag: String? = null) {
-        timerSessionDao.insert(
-            TimerSessionEntity(
-                timestamp = System.currentTimeMillis(),
-                durationSeconds = durationSeconds,
-                tag = tag?.takeIf { it.isNotBlank() }
-            )
+        val entity = TimerSessionEntity(
+            timestamp = System.currentTimeMillis(),
+            durationSeconds = durationSeconds,
+            tag = tag?.takeIf { it.isNotBlank() }
         )
+        Log.d("TimerSessionRepo", "Saving session: duration=${entity.durationSeconds}s, tag=${entity.tag}, ts=${entity.timestamp}")
+        timerSessionDao.insert(entity)
+        Log.d("TimerSessionRepo", "Session saved successfully")
     }
 
     fun getAllSessions(): Flow<List<TimerSessionEntity>> {
