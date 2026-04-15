@@ -36,7 +36,6 @@ import com.heartratemonitor.viewmodel.HeartRateViewModel
 import com.heartratemonitor.ble.ConnectionState
 import com.heartratemonitor.ble.AutoReconnectState
 import com.heartratemonitor.ui.screens.SettingsActivity
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.input.pointer.pointerInput
@@ -48,14 +47,11 @@ import android.Manifest
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.heartratemonitor.ble.BleScanner
-import android.media.Ringtone
-import android.media.RingtoneManager
-import android.net.Uri
+import com.heartratemonitor.service.TimerCountdownService
 import android.content.Intent
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import dagger.hilt.android.EntryPointAccessors
-import com.heartratemonitor.di.PreferencesEntryPoint
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
@@ -76,77 +72,48 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
     val hasAutoConnectAttempted by viewModel.hasAutoConnectAttempted.collectAsState()
     val hasAutoConnectedDevice by viewModel.hasAutoConnectedDevice.collectAsState()
 
-    // 倒计时状态提升到此处，避免切换Tab时状态丢失
-    var timerTotalSeconds by remember { mutableIntStateOf(40) }
-    var timerRemainingSeconds by remember { mutableIntStateOf(40) }
-    var timerIsRunning by remember { mutableStateOf(false) }
+    // 倒计时本地输入状态
     var timerInputMinutes by remember { mutableStateOf("0") }
     var timerInputSeconds by remember { mutableStateOf("40") }
     var timerTagInput by remember { mutableStateOf("平板支撑") }
-    var timerHasPlayed by remember { mutableStateOf(false) }
+
+    // 倒计时运行状态从 TimerCountdownService 派生
+    val timerServiceState by viewModel.timerServiceState.collectAsState()
+
+    val inputComputedTotal = (timerInputMinutes.toIntOrNull() ?: 0) * 60 + (timerInputSeconds.toIntOrNull() ?: 0)
+
+    val timerTotalSeconds: Int = when (val s = timerServiceState) {
+        is TimerCountdownService.TimerServiceState.RUNNING -> s.totalSeconds
+        is TimerCountdownService.TimerServiceState.PAUSED -> s.totalSeconds
+        is TimerCountdownService.TimerServiceState.COMPLETED -> s.totalSeconds
+        is TimerCountdownService.TimerServiceState.IDLE -> if (inputComputedTotal > 0) inputComputedTotal else 40
+    }
+
+    val timerRemainingSeconds: Int = when (val s = timerServiceState) {
+        is TimerCountdownService.TimerServiceState.RUNNING -> s.remainingSeconds
+        is TimerCountdownService.TimerServiceState.PAUSED -> s.remainingSeconds
+        is TimerCountdownService.TimerServiceState.COMPLETED -> 0
+        is TimerCountdownService.TimerServiceState.IDLE -> timerTotalSeconds
+    }
+
+    val timerIsRunning: Boolean = timerServiceState is TimerCountdownService.TimerServiceState.RUNNING
 
     // 读取硅基流动 API Key
     val siliconFlowApiKey by viewModel.siliconFlowApiKey.collectAsState()
 
-    // 读取铃声偏好
-    val preferencesManager = remember {
-        EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            PreferencesEntryPoint::class.java
-        ).preferencesManager()
-    }
-    var timerSoundUri by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        preferencesManager.timerSoundUriFlow.collect { uri -> timerSoundUri = uri }
-    }
-
-    // MediaPlayer 持久持有，防止 GC 回收
-    val mediaPlayer = remember { android.media.MediaPlayer() }
-
-    // 倒计时逻辑（在 Tab 切换时继续运行）
-    LaunchedEffect(timerIsRunning, timerRemainingSeconds) {
-        if (timerIsRunning && timerRemainingSeconds > 0) {
-            delay(1000L)
-            timerRemainingSeconds--
-        } else if (timerRemainingSeconds == 0) {
-            timerIsRunning = false
-        }
-    }
-
-    // 倒计时结束：播放铃声 + Toast + 保存记录
-    LaunchedEffect(timerRemainingSeconds, timerIsRunning) {
-        if (timerRemainingSeconds == 0 && !timerIsRunning && !timerHasPlayed) {
-            timerHasPlayed = true
-            Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
-            viewModel.saveTimerSession(timerTotalSeconds, timerTagInput.ifBlank { null })
-            // 恢复输入框和倒计时到初始状态
-            timerInputMinutes = "0"
-            timerInputSeconds = "40"
-            timerTotalSeconds = 40
-            timerRemainingSeconds = 40
-            try {
-                mediaPlayer.reset()
-                val uri = if (timerSoundUri != null) Uri.parse(timerSoundUri)
-                    else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                mediaPlayer.setDataSource(context, uri)
-                mediaPlayer.setAudioAttributes(
-                    android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                mediaPlayer.prepare()
-                mediaPlayer.start()
-            } catch (_: Exception) {}
-        }
-        if (timerRemainingSeconds > 0) {
-            timerHasPlayed = false
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            try { mediaPlayer.release() } catch (_: Exception) {}
+    // 倒计时完成：Toast + 重置输入
+    var wasTimerCompleted by remember { mutableStateOf(false) }
+    LaunchedEffect(timerServiceState) {
+        when {
+            timerServiceState is TimerCountdownService.TimerServiceState.COMPLETED && !wasTimerCompleted -> {
+                wasTimerCompleted = true
+                Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
+            }
+            timerServiceState is TimerCountdownService.TimerServiceState.IDLE && wasTimerCompleted -> {
+                wasTimerCompleted = false
+                timerInputMinutes = "0"
+                timerInputSeconds = "40"
+            }
         }
     }
 
@@ -215,9 +182,35 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
                         inputMinutes = timerInputMinutes,
                         inputSeconds = timerInputSeconds,
                         tagInput = timerTagInput,
-                        onTotalSecondsChange = { timerTotalSeconds = it },
-                        onRemainingSecondsChange = { timerRemainingSeconds = it },
-                        onIsRunningChange = { timerIsRunning = it },
+                        onTotalSecondsChange = {}, // derived from service state or inputs
+                        onRemainingSecondsChange = {}, // derived from service state or inputs
+                        onIsRunningChange = { wantRunning ->
+                            when {
+                                wantRunning && timerServiceState is TimerCountdownService.TimerServiceState.RUNNING -> {
+                                    // already running, no-op
+                                }
+                                wantRunning && timerServiceState is TimerCountdownService.TimerServiceState.PAUSED -> {
+                                    val serviceTotal = (timerServiceState as TimerCountdownService.TimerServiceState.PAUSED).totalSeconds
+                                    if (inputComputedTotal == serviceTotal && inputComputedTotal > 0) {
+                                        viewModel.resumeTimerService()
+                                    } else if (inputComputedTotal > 0) {
+                                        viewModel.startTimerService(inputComputedTotal, timerTagInput.ifBlank { null })
+                                    }
+                                }
+                                wantRunning -> {
+                                    // IDLE or COMPLETED — start new timer
+                                    if (inputComputedTotal > 0) {
+                                        viewModel.startTimerService(inputComputedTotal, timerTagInput.ifBlank { null })
+                                    }
+                                }
+                                else -> {
+                                    // wantRunning == false — pause if running
+                                    if (timerServiceState is TimerCountdownService.TimerServiceState.RUNNING) {
+                                        viewModel.pauseTimerService()
+                                    }
+                                }
+                            }
+                        },
                         onInputMinutesChange = { timerInputMinutes = it },
                         onInputSecondsChange = { timerInputSeconds = it },
                         onTagInputChange = { timerTagInput = it }
@@ -520,9 +513,8 @@ fun RealTimeHeartRateScreen(
                     timerState.onInputSecondsChange(voiceResult.seconds.toString())
                     val total = voiceResult.minutes * 60 + voiceResult.seconds
                     if (total > 0) {
-                        timerState.onTotalSecondsChange(total)
-                        timerState.onRemainingSecondsChange(total)
-                        timerState.onIsRunningChange(true)
+                        // Start timer directly via ViewModel (bypasses the onIsRunningChange toggle logic)
+                        viewModel.startTimerService(total, voiceResult.eventName.ifBlank { null })
                     }
                     Toast.makeText(
                         context,

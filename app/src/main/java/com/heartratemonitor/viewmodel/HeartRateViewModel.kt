@@ -35,6 +35,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.heartratemonitor.service.BleHeartRateService
+import com.heartratemonitor.service.TimerCountdownService
 import dagger.hilt.android.qualifiers.ApplicationContext
 
 /**
@@ -146,6 +147,13 @@ class HeartRateViewModel @Inject constructor(
         SharingStarted.Eagerly,
         emptyList()
     )
+
+    // Timer countdown service state (from TimerCountdownService)
+    private val _timerServiceState = MutableStateFlow<TimerCountdownService.TimerServiceState>(
+        TimerCountdownService.TimerServiceState.IDLE
+    )
+    val timerServiceState: StateFlow<TimerCountdownService.TimerServiceState> = _timerServiceState
+    private var timerStateCollectJob: Job? = null
 
     // Timer sessions filtered by time range
     private val _timerFilterDays = MutableStateFlow(7)
@@ -551,6 +559,60 @@ class HeartRateViewModel @Inject constructor(
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             preferencesManager.saveHeartbeatSoundEnabled(value)
         }
+    }
+
+    /**
+     * Bind to TimerCountdownService to observe its state
+     */
+    fun bindTimerService(service: TimerCountdownService) {
+        timerStateCollectJob?.cancel()
+        timerStateCollectJob = viewModelScope.launch {
+            service.serviceState.collect { state ->
+                _timerServiceState.value = state
+            }
+        }
+    }
+
+    fun unbindTimerService() {
+        timerStateCollectJob?.cancel()
+        timerStateCollectJob = null
+    }
+
+    /**
+     * Start timer countdown via foreground service
+     */
+    fun startTimerService(totalSeconds: Int, tag: String?) {
+        val intent = Intent(context, TimerCountdownService::class.java).apply {
+            action = TimerCountdownService.ACTION_START
+            putExtra(TimerCountdownService.EXTRA_TOTAL_SECONDS, totalSeconds)
+            putExtra(TimerCountdownService.EXTRA_TAG, tag)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+    }
+
+    fun pauseTimerService() {
+        val intent = Intent(context, TimerCountdownService::class.java).apply {
+            action = TimerCountdownService.ACTION_PAUSE
+        }
+        context.startService(intent)
+    }
+
+    fun resumeTimerService() {
+        val intent = Intent(context, TimerCountdownService::class.java).apply {
+            action = TimerCountdownService.ACTION_RESUME
+        }
+        context.startService(intent)
+    }
+
+    fun stopTimerService() {
+        val intent = Intent(context, TimerCountdownService::class.java).apply {
+            action = TimerCountdownService.ACTION_STOP
+        }
+        context.startService(intent)
     }
 
     override fun onCleared() {

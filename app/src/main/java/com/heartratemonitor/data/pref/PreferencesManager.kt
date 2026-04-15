@@ -47,6 +47,11 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     val cachedHeartbeatSoundEnabled: Boolean
         get() = _cachedHeartbeatSoundEnabled
 
+    @Volatile
+    private var _cachedTimerSoundUri: String? = null
+    val cachedTimerSoundUri: String?
+        get() = _cachedTimerSoundUri
+
     companion object {
         // 高心率阈值
         private val HIGH_THRESHOLD_KEY = intPreferencesKey("high_threshold")
@@ -142,6 +147,11 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         scope.launch {
             heartbeatSoundEnabledFlow.collect {
                 _cachedHeartbeatSoundEnabled = it
+            }
+        }
+        scope.launch {
+            timerSoundUriFlow.collect {
+                _cachedTimerSoundUri = it
             }
         }
     }
