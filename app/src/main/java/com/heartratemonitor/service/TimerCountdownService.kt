@@ -95,13 +95,14 @@ class TimerCountdownService : Service() {
     val serviceState: StateFlow<TimerServiceState> = _serviceState
 
     private var countdownJob: Job? = null
-    private var totalSeconds = 0
-    private var remainingSeconds = 0
-    private var endTimeMs = 0L
-    private var tag: String? = null
+    @Volatile private var totalSeconds = 0
+    @Volatile private var remainingSeconds = 0
+    @Volatile private var endTimeMs = 0L
+    @Volatile private var tag: String? = null
     private var alarmPendingIntent: PendingIntent? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var mediaPlayer: MediaPlayer? = null
+    @Volatile private var isCompleted = false
 
     inner class LocalBinder : Binder() {
         fun getService(): TimerCountdownService = this@TimerCountdownService
@@ -160,6 +161,7 @@ class TimerCountdownService : Service() {
     private fun startCountdown(totalSecs: Int, timerTag: String?) {
         countdownJob?.cancel()
         cancelExactAlarm()
+        isCompleted = false
 
         this.totalSeconds = totalSecs
         this.remainingSeconds = totalSecs
@@ -248,6 +250,10 @@ class TimerCountdownService : Service() {
     }
 
     private fun onTimerComplete() {
+        // Guard against double invocation from concurrent tick + alarm race
+        if (isCompleted) return
+        isCompleted = true
+
         countdownJob?.cancel()
         cancelExactAlarm()
 
@@ -270,13 +276,11 @@ class TimerCountdownService : Service() {
         // Show dismissible completion notification
         showCompletionNotification()
 
-        // Release foreground status, then clean up after a short delay
-        stopForeground(STOP_FOREGROUND_REMOVE)
-
+        // Keep foreground alive during sound playback, then release
         serviceScope.launch {
-            // Give sound time to finish before fully stopping
             delay(TimeUnit.SECONDS.toMillis(5))
             releaseWakeLock()
+            stopForeground(STOP_FOREGROUND_DETACH)
             _serviceState.value = TimerServiceState.IDLE
             stopSelf()
         }
