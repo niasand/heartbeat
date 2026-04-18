@@ -276,13 +276,21 @@ class TimerCountdownService : Service() {
         // Show dismissible completion notification
         showCompletionNotification()
 
-        // Keep foreground alive during sound playback, then release
-        serviceScope.launch {
-            delay(TimeUnit.SECONDS.toMillis(1))
+        // Release foreground once sound finishes or after safety timeout (5s)
+        fun releaseAfterSound() {
             releaseWakeLock()
             stopForeground(STOP_FOREGROUND_DETACH)
             _serviceState.value = TimerServiceState.IDLE
             stopSelf()
+        }
+        mediaPlayer?.setOnCompletionListener {
+            Log.d(TAG, "Completion sound finished, releasing foreground")
+            releaseAfterSound()
+        }
+        // Safety timeout: some sounds may not trigger OnCompletionListener
+        serviceScope.launch {
+            delay(TimeUnit.SECONDS.toMillis(5))
+            releaseAfterSound()
         }
     }
 
