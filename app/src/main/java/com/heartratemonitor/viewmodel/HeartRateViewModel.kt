@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -280,8 +281,9 @@ class HeartRateViewModel @Inject constructor(
         }
 
         // Load timer sessions filtered by time range (tag filter applied via combine above)
+        // Use collectLatest to cancel previous inner Flow collection when filter changes
         viewModelScope.launch {
-            _timerFilterDays.collect { days ->
+            _timerFilterDays.collectLatest { days ->
                 val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
                 timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
                     _sessionsInTimeRange.value = sessions
