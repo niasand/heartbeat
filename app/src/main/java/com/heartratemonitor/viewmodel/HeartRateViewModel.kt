@@ -175,7 +175,7 @@ class HeartRateViewModel @Inject constructor(
         if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    // Tag-filtered count by date for chart
+    // Tag-filtered count by date for chart (used by 7天/30天 views)
     val filteredTimerCountByDate: StateFlow<List<DateCountPair>> = combine(
         _sessionsInTimeRange, _timerFilterTag
     ) { sessions, tag ->
@@ -186,6 +186,20 @@ class HeartRateViewModel @Inject constructor(
                     .format(java.util.Date(session.timestamp))
             }
             .map { (date, list) -> DateCountPair(date, list.size) }
+            .sortedBy { it.date }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Tag-filtered count by month for chart (used by 6个月/1年 views)
+    val filteredTimerCountByMonth: StateFlow<List<DateCountPair>> = combine(
+        _sessionsInTimeRange, _timerFilterTag
+    ) { sessions, tag ->
+        val filtered = if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
+        filtered
+            .groupBy { session ->
+                java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
+                    .format(java.util.Date(session.timestamp))
+            }
+            .map { (month, list) -> DateCountPair(month, list.size) }
             .sortedBy { it.date }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
