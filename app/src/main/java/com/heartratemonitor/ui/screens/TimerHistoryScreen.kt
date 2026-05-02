@@ -43,6 +43,7 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
     val sessions by viewModel.filteredTimerSessions.collectAsState()
     val context = LocalContext.current
     val countByDate by viewModel.filteredTimerCountByDate.collectAsState()
+    val countByMonth by viewModel.filteredTimerCountByMonth.collectAsState()
     val currentFilter by viewModel.timerFilterDays.collectAsState()
     val currentTagFilter by viewModel.timerFilterTag.collectAsState()
     val allSessionsInRange by viewModel.sessionsInTimeRange.collectAsState()
@@ -70,9 +71,11 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
             }
         }
 
-        // Bar chart
+        // Bar chart — switch data source based on filter range
+        val isMonthly = currentFilter >= 180
         TimerBarChart(
-            countByDate = countByDate,
+            countByDate = if (isMonthly) countByMonth else countByDate,
+            isMonthly = isMonthly,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -205,7 +208,8 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
 @Composable
 private fun TimerBarChart(
     countByDate: List<com.heartratemonitor.data.dao.DateCountPair>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isMonthly: Boolean = false
 ) {
     if (countByDate.isEmpty()) {
         Box(modifier = modifier.padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
@@ -218,8 +222,8 @@ private fun TimerBarChart(
     val barAreaHeight = 140.dp
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
 
-    // When there are too many bars, only show the last N to avoid crowding
-    val displayData = if (countByDate.size > 14) countByDate.takeLast(14) else countByDate
+    // Daily view: limit to 14 bars; Monthly view: show all (max ~12 bars)
+    val displayData = if (isMonthly) countByDate else if (countByDate.size > 14) countByDate.takeLast(14) else countByDate
 
     Column(modifier = modifier) {
         Text(
@@ -305,7 +309,12 @@ private fun TimerBarChart(
             horizontalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             displayData.forEach { pair ->
-                val dateLabel = pair.date.substring(5) // MM-DD
+                val dateLabel = if (isMonthly) {
+                    // "yyyy-MM" → "M月" (e.g. "2026-01" → "1月")
+                    pair.date.substring(5).replaceFirst("^0".toRegex(), "") + "月"
+                } else {
+                    pair.date.substring(5) // MM-DD
+                }
                 Text(
                     text = dateLabel,
                     fontSize = 10.sp,

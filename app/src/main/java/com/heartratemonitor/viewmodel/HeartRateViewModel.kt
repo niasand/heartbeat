@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -174,7 +175,7 @@ class HeartRateViewModel @Inject constructor(
         if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    // Tag-filtered count by date for chart
+    // Tag-filtered count by date for chart (used by 7天/30天 views)
     val filteredTimerCountByDate: StateFlow<List<DateCountPair>> = combine(
         _sessionsInTimeRange, _timerFilterTag
     ) { sessions, tag ->
@@ -185,6 +186,20 @@ class HeartRateViewModel @Inject constructor(
                     .format(java.util.Date(session.timestamp))
             }
             .map { (date, list) -> DateCountPair(date, list.size) }
+            .sortedBy { it.date }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Tag-filtered count by month for chart (used by 6个月/1年 views)
+    val filteredTimerCountByMonth: StateFlow<List<DateCountPair>> = combine(
+        _sessionsInTimeRange, _timerFilterTag
+    ) { sessions, tag ->
+        val filtered = if (tag.isNullOrBlank()) sessions else sessions.filter { it.tag == tag }
+        filtered
+            .groupBy { session ->
+                java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
+                    .format(java.util.Date(session.timestamp))
+            }
+            .map { (month, list) -> DateCountPair(month, list.size) }
             .sortedBy { it.date }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -280,8 +295,9 @@ class HeartRateViewModel @Inject constructor(
         }
 
         // Load timer sessions filtered by time range (tag filter applied via combine above)
+        // Use collectLatest to cancel previous inner Flow collection when filter changes
         viewModelScope.launch {
-            _timerFilterDays.collect { days ->
+            _timerFilterDays.collectLatest { days ->
                 val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
                 timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
                     _sessionsInTimeRange.value = sessions

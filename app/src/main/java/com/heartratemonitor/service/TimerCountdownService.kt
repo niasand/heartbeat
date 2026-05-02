@@ -278,7 +278,7 @@ class TimerCountdownService : Service() {
 
         // Keep foreground alive during sound playback, then release
         serviceScope.launch {
-            delay(TimeUnit.SECONDS.toMillis(5))
+            delay(TimeUnit.SECONDS.toMillis(1))
             releaseWakeLock()
             stopForeground(STOP_FOREGROUND_DETACH)
             _serviceState.value = TimerServiceState.IDLE

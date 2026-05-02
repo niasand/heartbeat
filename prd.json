@@ -1,0 +1,54 @@
+{
+  "project": "HeartRateMonitor",
+  "branchName": "ralph/monthly-chart-aggregation",
+  "description": "计时历史图表按月聚合展示 - 6个月和1年过滤器下图表按月聚合，7天和30天保持按天",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "ViewModel 新增 filteredTimerCountByMonth StateFlow",
+      "description": "As a developer, I need a monthly aggregated data flow so the chart can display monthly counts for 6-month and 1-year views.",
+      "acceptanceCriteria": [
+        "Add filteredTimerCountByMonth StateFlow in HeartRateViewModel.kt",
+        "Groups sessions by 'yyyy-MM' format and sums counts per month",
+        "DateCountPair.date stored as 'yyyy-MM', sorted ascending",
+        "filterDays < 180 emits empty list (UI decides not to use it)",
+        "Uses combine(_sessionsInTimeRange, _timerFilterTag) pattern matching existing filteredTimerCountByDate",
+        "Build passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Reference: HeartRateViewModel.kt line 178-189 for existing filteredTimerCountByDate implementation pattern"
+    },
+    {
+      "id": "US-002",
+      "title": "TimerBarChart 支持月视图和天视图",
+      "description": "As a user, I want the bar chart to correctly display both daily and monthly aggregated data with appropriate axis labels.",
+      "acceptanceCriteria": [
+        "TimerBarChart accepts isMonthly: Boolean parameter",
+        "Monthly view: X-axis labels show 'M月' format (e.g. '1月', '2月'), extracted from 'yyyy-MM' date string",
+        "Monthly view: no takeLast(14) limit (max 12 bars for 1 year, fits screen)",
+        "Daily view: existing logic unchanged including takeLast(14) when > 14 bars",
+        "Daily view: X-axis labels show MM-DD format (existing 'pair.date.substring(5)' logic unchanged)",
+        "Build passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Reference: TimerHistoryScreen.kt line 206-319 for existing TimerBarChart implementation"
+    },
+    {
+      "id": "US-003",
+      "title": "UI 层根据 filterDays 切换图表数据源",
+      "description": "As a user, I want the chart to automatically show monthly data when I select 6-month or 1-year filter.",
+      "acceptanceCriteria": [
+        "When filterDays is 7 or 30: chart uses filteredTimerCountByDate with isMonthly=false",
+        "When filterDays is 180 or 365: chart uses filteredTimerCountByMonth with isMonthly=true",
+        "History list always uses filteredTimerSessions, unaffected by chart aggregation",
+        "Tag filter (tag dropdown) still works correctly in both daily and monthly views",
+        "Build passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Reference: TimerHistoryScreen.kt line 74-79 where TimerBarChart is called"
+    }
+  ]
+}
