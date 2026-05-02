@@ -1,5 +1,8 @@
 package com.heartratemonitor.ui.screens
 
+private const val DEFAULT_TIMER_SECONDS = "40"
+private const val DEFAULT_TIMER_SECONDS_INT = 40
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -74,7 +77,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
 
     // 倒计时本地输入状态
     var timerInputMinutes by remember { mutableStateOf("0") }
-    var timerInputSeconds by remember { mutableStateOf("40") }
+    var timerInputSeconds by remember { mutableStateOf(DEFAULT_TIMER_SECONDS) }
     var timerTagInput by remember { mutableStateOf("平板支撑") }
 
     // 倒计时运行状态从 TimerCountdownService 派生
@@ -86,7 +89,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
         is TimerCountdownService.TimerServiceState.RUNNING -> s.totalSeconds
         is TimerCountdownService.TimerServiceState.PAUSED -> s.totalSeconds
         is TimerCountdownService.TimerServiceState.COMPLETED -> s.totalSeconds
-        is TimerCountdownService.TimerServiceState.IDLE -> if (inputComputedTotal > 0) inputComputedTotal else 40
+        is TimerCountdownService.TimerServiceState.IDLE -> if (inputComputedTotal > 0) inputComputedTotal else DEFAULT_TIMER_SECONDS_INT
     }
 
     val timerRemainingSeconds: Int = when (val s = timerServiceState) {
@@ -118,7 +121,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
                 if (wasTimerActive) {
                     wasTimerActive = false
                     timerInputMinutes = "0"
-                    timerInputSeconds = "40"
+                    timerInputSeconds = DEFAULT_TIMER_SECONDS
                 }
             }
         }
