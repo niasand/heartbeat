@@ -102,17 +102,24 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
     val siliconFlowApiKey by viewModel.siliconFlowApiKey.collectAsState()
 
     // 倒计时完成：Toast + 重置输入
-    var wasTimerCompleted by remember { mutableStateOf(false) }
+    // 用 wasTimerActive 替代 wasTimerCompleted，避免后台完成时错过 COMPLETED 状态导致输入不重置
+    var wasTimerActive by remember { mutableStateOf(false) }
     LaunchedEffect(timerServiceState) {
-        when {
-            timerServiceState is TimerCountdownService.TimerServiceState.COMPLETED && !wasTimerCompleted -> {
-                wasTimerCompleted = true
+        when (timerServiceState) {
+            is TimerCountdownService.TimerServiceState.RUNNING,
+            is TimerCountdownService.TimerServiceState.PAUSED -> {
+                wasTimerActive = true
+            }
+            is TimerCountdownService.TimerServiceState.COMPLETED -> {
+                wasTimerActive = true
                 Toast.makeText(context, "倒计时结束！", Toast.LENGTH_LONG).show()
             }
-            timerServiceState is TimerCountdownService.TimerServiceState.IDLE && wasTimerCompleted -> {
-                wasTimerCompleted = false
-                timerInputMinutes = "0"
-                timerInputSeconds = "40"
+            is TimerCountdownService.TimerServiceState.IDLE -> {
+                if (wasTimerActive) {
+                    wasTimerActive = false
+                    timerInputMinutes = "0"
+                    timerInputSeconds = "40"
+                }
             }
         }
     }
