@@ -264,6 +264,7 @@ private fun TimerHistoryContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AlarmHistoryContent(
     alarms: List<com.heartratemonitor.data.entity.AlarmRecordEntity>,
