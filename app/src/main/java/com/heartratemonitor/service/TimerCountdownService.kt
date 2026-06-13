@@ -24,6 +24,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.heartratemonitor.R
 import com.heartratemonitor.data.pref.PreferencesManager
+import com.heartratemonitor.data.repository.AlarmRecordRepository
 import com.heartratemonitor.data.repository.TimerSessionRepository
 import com.heartratemonitor.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -60,6 +61,7 @@ class TimerCountdownService : Service() {
         private const val ACTION_ALARM_FIRE = "com.heartratemonitor.timer.ALARM_FIRE"
         const val EXTRA_TOTAL_SECONDS = "extra_total_seconds"
         const val EXTRA_TAG = "extra_tag"
+        const val EXTRA_ALARM_RECORD_ID = "extra_alarm_record_id"
         private const val WAKE_LOCK_TIMEOUT_MS = 10_000L
     }
 
@@ -69,16 +71,19 @@ class TimerCountdownService : Service() {
             val totalSeconds: Int,
             val remainingSeconds: Int,
             val endTimeMs: Long,
-            val tag: String?
+            val tag: String?,
+            val alarmRecordId: Long? = null
         ) : TimerServiceState()
         data class PAUSED(
             val totalSeconds: Int,
             val remainingSeconds: Int,
-            val tag: String?
+            val tag: String?,
+            val alarmRecordId: Long? = null
         ) : TimerServiceState()
         data class COMPLETED(
             val totalSeconds: Int,
-            val tag: String?
+            val tag: String?,
+            val alarmRecordId: Long? = null
         ) : TimerServiceState()
     }
 
@@ -87,6 +92,9 @@ class TimerCountdownService : Service() {
 
     @Inject
     lateinit var timerSessionRepository: TimerSessionRepository
+
+    @Inject
+    lateinit var alarmRecordRepository: AlarmRecordRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val binder = LocalBinder()
@@ -99,6 +107,7 @@ class TimerCountdownService : Service() {
     @Volatile private var remainingSeconds = 0
     @Volatile private var endTimeMs = 0L
     @Volatile private var tag: String? = null
+    @Volatile private var alarmRecordId: Long? = null
     private var alarmPendingIntent: PendingIntent? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var mediaPlayer: MediaPlayer? = null
@@ -134,7 +143,8 @@ class TimerCountdownService : Service() {
             ACTION_START -> {
                 val seconds = intent.getIntExtra(EXTRA_TOTAL_SECONDS, 0)
                 val timerTag = intent.getStringExtra(EXTRA_TAG)
-                if (seconds > 0) startCountdown(seconds, timerTag)
+                val recordId = intent.getLongExtra(EXTRA_ALARM_RECORD_ID, 0L).takeIf { it > 0L }
+                if (seconds > 0) startCountdown(seconds, timerTag, recordId)
             }
             ACTION_PAUSE -> pauseCountdown()
             ACTION_RESUME -> resumeCountdown()
@@ -158,17 +168,24 @@ class TimerCountdownService : Service() {
 
     // region Countdown control
 
-    private fun startCountdown(totalSecs: Int, timerTag: String?) {
+    private fun startCountdown(totalSecs: Int, timerTag: String?, recordId: Long?) {
+        val previousAlarmRecordId = alarmRecordId
         countdownJob?.cancel()
         cancelExactAlarm()
+        if (previousAlarmRecordId != null && previousAlarmRecordId != recordId) {
+            serviceScope.launch {
+                alarmRecordRepository.markCanceled(previousAlarmRecordId)
+            }
+        }
         isCompleted = false
 
         this.totalSeconds = totalSecs
         this.remainingSeconds = totalSecs
         this.tag = timerTag
+        this.alarmRecordId = recordId
         this.endTimeMs = System.currentTimeMillis() + totalSecs.toLong() * 1000L
 
-        _serviceState.value = TimerServiceState.RUNNING(totalSeconds, remainingSeconds, endTimeMs, tag)
+        _serviceState.value = TimerServiceState.RUNNING(totalSeconds, remainingSeconds, endTimeMs, tag, alarmRecordId)
 
         // Start foreground immediately to meet the 5-second deadline
         startForegroundSafely(createRunningNotification())
@@ -190,7 +207,7 @@ class TimerCountdownService : Service() {
 
                 this@TimerCountdownService.remainingSeconds = remaining
                 _serviceState.value = TimerServiceState.RUNNING(
-                    totalSeconds, remaining, endTimeMs, tag
+                    totalSeconds, remaining, endTimeMs, tag, alarmRecordId
                 )
                 updateRunningNotification()
 
@@ -204,7 +221,7 @@ class TimerCountdownService : Service() {
         cancelExactAlarm()
 
         val pausedRemaining = remainingSeconds
-        _serviceState.value = TimerServiceState.PAUSED(totalSeconds, pausedRemaining, tag)
+        _serviceState.value = TimerServiceState.PAUSED(totalSeconds, pausedRemaining, tag, alarmRecordId)
         updatePausedNotification(pausedRemaining)
     }
 
@@ -213,7 +230,7 @@ class TimerCountdownService : Service() {
         this.endTimeMs = System.currentTimeMillis() + remainingSeconds.toLong() * 1000L
 
         _serviceState.value = TimerServiceState.RUNNING(
-            totalSeconds, remainingSeconds, endTimeMs, tag
+            totalSeconds, remainingSeconds, endTimeMs, tag, alarmRecordId
         )
         setExactAlarm(endTimeMs)
 
@@ -230,7 +247,7 @@ class TimerCountdownService : Service() {
 
                 this@TimerCountdownService.remainingSeconds = remaining
                 _serviceState.value = TimerServiceState.RUNNING(
-                    totalSeconds, remaining, endTimeMs, tag
+                    totalSeconds, remaining, endTimeMs, tag, alarmRecordId
                 )
                 updateRunningNotification()
 
@@ -240,10 +257,17 @@ class TimerCountdownService : Service() {
     }
 
     private fun stopCountdown() {
+        val canceledAlarmRecordId = alarmRecordId
         countdownJob?.cancel()
         cancelExactAlarm()
         releaseWakeLock()
         try { mediaPlayer?.stop() } catch (_: Exception) {}
+        if (canceledAlarmRecordId != null) {
+            serviceScope.launch {
+                alarmRecordRepository.markCanceled(canceledAlarmRecordId)
+            }
+        }
+        alarmRecordId = null
         _serviceState.value = TimerServiceState.IDLE
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -260,7 +284,8 @@ class TimerCountdownService : Service() {
         // Acquire WakeLock so CPU stays awake for sound playback + save
         acquireWakeLock()
 
-        _serviceState.value = TimerServiceState.COMPLETED(totalSeconds, tag)
+        val completedAlarmRecordId = alarmRecordId
+        _serviceState.value = TimerServiceState.COMPLETED(totalSeconds, tag, completedAlarmRecordId)
 
         // Vibrate
         vibrate()
@@ -271,6 +296,9 @@ class TimerCountdownService : Service() {
         // Save session to database
         serviceScope.launch {
             timerSessionRepository.saveSession(totalSeconds, tag)
+            completedAlarmRecordId?.let {
+                alarmRecordRepository.markFired(it)
+            }
         }
 
         // Show dismissible completion notification
@@ -281,6 +309,7 @@ class TimerCountdownService : Service() {
             delay(TimeUnit.SECONDS.toMillis(1))
             releaseWakeLock()
             stopForeground(STOP_FOREGROUND_DETACH)
+            alarmRecordId = null
             _serviceState.value = TimerServiceState.IDLE
             stopSelf()
         }
@@ -489,13 +518,18 @@ class TimerCountdownService : Service() {
     private fun showCompletionNotification() {
         try {
             val durationText = formatDuration(totalSeconds)
-            val tagLabel = tag?.let { "$it — " } ?: ""
+            val isAlarm = alarmRecordId != null
+            val alarmLabel = tag?.removePrefix("闹钟：")
             val nm = getSystemService(NotificationManager::class.java)
             nm.notify(
                 NOTIFICATION_ID,
                 buildTimerNotification(
-                    title = "${tagLabel}倒计时结束!",
-                    contentText = "时长 $durationText",
+                    title = if (isAlarm) {
+                        "${alarmLabel ?: "智能闹钟"}时间到了"
+                    } else {
+                        "${tag?.let { "$it — " } ?: ""}倒计时结束!"
+                    },
+                    contentText = if (isAlarm) "闹钟提醒" else "时长 $durationText",
                     ongoing = false
                 )
             )
@@ -512,7 +546,7 @@ class TimerCountdownService : Service() {
 
     @SuppressLint("NotificationPermission")
     private fun buildTimerNotification(
-        title: String = "倒计时${tag?.let { " — $it" } ?: ""}",
+        title: String = defaultNotificationTitle(),
         contentText: String,
         ongoing: Boolean,
         actions: List<NotificationAction> = emptyList()
@@ -565,6 +599,15 @@ class TimerCountdownService : Service() {
         val mins = totalSecs / 60
         val secs = totalSecs % 60
         return if (mins > 0) "${mins}分${secs}秒" else "${secs}秒"
+    }
+
+    private fun defaultNotificationTitle(): String {
+        val label = tag?.removePrefix("闹钟：")
+        return if (alarmRecordId != null) {
+            "闹钟${label?.let { " — $it" } ?: ""}"
+        } else {
+            "倒计时${tag?.let { " — $it" } ?: ""}"
+        }
     }
 
     // endregion

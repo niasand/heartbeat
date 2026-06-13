@@ -39,6 +39,7 @@ import android.Manifest
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.heartratemonitor.ble.BleScanner
+import com.heartratemonitor.data.entity.AlarmRecordEntity
 import com.heartratemonitor.service.TimerCountdownService
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material.icons.outlined.Notifications
@@ -223,6 +224,81 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
     }
 }
 
+@Composable
+private fun ActiveAlarmCard(
+    alarm: AlarmRecordEntity,
+    onCancel: () -> Unit
+) {
+    var nowMillis by remember(alarm.id) { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(alarm.id) {
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000L)
+        }
+    }
+
+    val remainingSeconds = ((alarm.targetTimeMillis - nowMillis) / 1000L).coerceAtLeast(0L)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "当前闹钟",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.72f)
+                )
+                Text(
+                    text = alarm.label,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Text(
+                    text = "${formatAlarmTargetTime(alarm.targetTimeMillis)} · 剩余 ${formatAlarmRemainingDuration(remainingSeconds)}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.72f)
+                )
+            }
+            TextButton(onClick = onCancel) {
+                Text("取消")
+            }
+        }
+    }
+}
+
+private fun formatAlarmRemainingDuration(totalSeconds: Long): String {
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+
+    return when {
+        hours > 0L -> "${hours}小时${minutes.toString().padStart(2, '0')}分"
+        minutes > 0L -> "${minutes}分${seconds.toString().padStart(2, '0')}秒"
+        else -> "${seconds}秒"
+    }
+}
+
 /**
  * 倒计时状态（提升到 HeartRateScreen 以支持 Tab 切换后保持状态）
  */
@@ -263,6 +339,7 @@ fun RealTimeHeartRateScreen(
     val hasAutoConnectAttempted by viewModel.hasAutoConnectAttempted.collectAsState()
     val hasAutoConnectedDevice by viewModel.hasAutoConnectedDevice.collectAsState()
     val heartRateHistory by viewModel.heartRateHistory.collectAsState()
+    val activeAlarmRecord by viewModel.activeAlarmRecord.collectAsState()
 
     // 权限状态（Android 13+ 需要 POST_NOTIFICATIONS 才能显示前台服务通知）
     val permissionsState = rememberMultiplePermissionsState(
@@ -496,7 +573,9 @@ fun RealTimeHeartRateScreen(
         CountdownTimerCard(
             state = timerState,
             onShowVoiceDialog = { showVoiceInputDialog = true },
-            onShowAlarmDialog = { showAlarmInputDialog = true }
+            onShowAlarmDialog = { showAlarmInputDialog = true },
+            activeAlarm = activeAlarmRecord,
+            onCancelAlarm = { alarm -> viewModel.cancelAlarm(alarm.id) }
         )
     }
 
@@ -577,7 +656,11 @@ fun RealTimeHeartRateScreen(
                     timerState.onTagInputChange(alarmTag)
                     timerState.onInputMinutesChange((secondsUntilAlarm / 60).toString())
                     timerState.onInputSecondsChange((secondsUntilAlarm % 60).toString())
-                    viewModel.startTimerService(secondsUntilAlarm, alarmTag)
+                    viewModel.startAlarmService(
+                        durationSeconds = secondsUntilAlarm,
+                        label = alarmResult.eventName,
+                        targetTimeMillis = targetTimeMillis
+                    )
 
                     Toast.makeText(
                         context,
@@ -623,7 +706,9 @@ private fun formatAlarmTargetTime(targetTimeMillis: Long): String {
 fun CountdownTimerCard(
     state: TimerState,
     onShowVoiceDialog: () -> Unit,
-    onShowAlarmDialog: () -> Unit
+    onShowAlarmDialog: () -> Unit,
+    activeAlarm: AlarmRecordEntity?,
+    onCancelAlarm: (AlarmRecordEntity) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Card(
@@ -775,6 +860,13 @@ fun CountdownTimerCard(
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text("智能闹钟", fontSize = 14.sp)
+    }
+
+    activeAlarm?.let { alarm ->
+        ActiveAlarmCard(
+            alarm = alarm,
+            onCancel = { onCancelAlarm(alarm) }
+        )
     }
     }
 }
