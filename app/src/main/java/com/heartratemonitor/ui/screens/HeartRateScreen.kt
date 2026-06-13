@@ -11,7 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -62,9 +62,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
     val context = LocalContext.current
     var connectAttemptId by remember { mutableIntStateOf(0) }
 
-    // 自动连接状态从 ViewModel 读取，避免 Activity 切换时重置导致重复连接
-    val hasAutoConnectAttempted by viewModel.hasAutoConnectAttempted.collectAsState()
-    val hasAutoConnectedDevice by viewModel.hasAutoConnectedDevice.collectAsState()
+    // 自动连接状态在 RealTimeHeartRateScreen 内读取（该处才使用），避免此处重复 collect
 
     // 倒计时本地输入状态
     var timerInputMinutes by remember { mutableStateOf("0") }
@@ -151,7 +149,7 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
                     onClick = { selectedTab = 0 }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.List, contentDescription = null) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
                     label = { Text(stringResource(R.string.history)) },
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 }
@@ -343,7 +341,6 @@ fun RealTimeHeartRateScreen(
     val lastDeviceAddress by viewModel.lastDeviceAddress.collectAsState()
     val hasAutoConnectAttempted by viewModel.hasAutoConnectAttempted.collectAsState()
     val hasAutoConnectedDevice by viewModel.hasAutoConnectedDevice.collectAsState()
-    val heartRateHistory by viewModel.heartRateHistory.collectAsState()
     val activeAlarmRecord by viewModel.activeAlarmRecord.collectAsState()
 
     // 权限状态（Android 13+ 需要 POST_NOTIFICATIONS 才能显示前台服务通知）
@@ -774,7 +771,7 @@ fun CountdownTimerCard(
                 }
             }
 
-            // 单个分钟数输入（合并原分/秒双框），秒数恒为 0
+            // 分/秒双输入框：保留默认 40 秒意图（方便平板支撑分组等非整分钟场景）
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -784,25 +781,41 @@ fun CountdownTimerCard(
                     onValueChange = { text ->
                         if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..999 } == true)) {
                             state.onInputMinutesChange(text)
-                            // 单输入框模式下秒数恒为 0，避免残留默认值污染总时长
-                            state.onInputSecondsChange("0")
                             if (!state.isRunning) {
                                 val mins = text.toIntOrNull() ?: 0
-                                if (mins > 0) {
-                                    val total = mins * 60
-                                    state.onTotalSecondsChange(total)
-                                    state.onRemainingSecondsChange(total)
-                                }
+                                val secs = state.inputSeconds.toIntOrNull() ?: 0
+                                val total = mins * 60 + secs
+                                if (total > 0) { state.onTotalSecondsChange(total); state.onRemainingSecondsChange(total) }
                             }
                         }
                     },
-                    modifier = Modifier.width(80.dp),
+                    modifier = Modifier.width(64.dp),
                     singleLine = true,
                     enabled = !state.isRunning,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                 )
-                Text("分钟", fontSize = 14.sp)
+                Text("分", fontSize = 14.sp)
+                OutlinedTextField(
+                    value = state.inputSeconds,
+                    onValueChange = { text ->
+                        if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..59 } == true)) {
+                            state.onInputSecondsChange(text)
+                            if (!state.isRunning) {
+                                val mins = state.inputMinutes.toIntOrNull() ?: 0
+                                val secs = text.toIntOrNull() ?: 0
+                                val total = mins * 60 + secs
+                                if (total > 0) { state.onTotalSecondsChange(total); state.onRemainingSecondsChange(total) }
+                            }
+                        }
+                    },
+                    modifier = Modifier.width(64.dp),
+                    singleLine = true,
+                    enabled = !state.isRunning,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
+                )
+                Text("秒", fontSize = 14.sp)
             }
         }
     }
