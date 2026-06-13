@@ -6,6 +6,8 @@ import com.heartratemonitor.data.entity.HeartRateEntity
 import com.heartratemonitor.data.pref.PreferencesManager
 import com.heartratemonitor.data.repository.HeartRateRepository
 import com.heartratemonitor.data.repository.TimerSessionRepository
+import com.heartratemonitor.data.repository.AlarmRecordRepository
+import com.heartratemonitor.data.entity.AlarmRecordEntity
 import com.heartratemonitor.data.entity.TimerSessionEntity
 import com.heartratemonitor.data.sync.SyncRepository
 import com.heartratemonitor.data.sync.SyncResult
@@ -46,6 +48,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 class HeartRateViewModel @Inject constructor(
     private val heartRateRepository: HeartRateRepository,
     private val timerSessionRepository: TimerSessionRepository,
+    private val alarmRecordRepository: AlarmRecordRepository,
     private val preferencesManager: PreferencesManager,
     private val bleScanner: BleScanner,
     private val bleConnectionManager: BleConnectionManager,
@@ -141,6 +144,12 @@ class HeartRateViewModel @Inject constructor(
         viewModelScope,
         SharingStarted.Eagerly,
         emptyList()
+    )
+
+    val activeAlarmRecord: StateFlow<AlarmRecordEntity?> = alarmRecordRepository.getActiveAlarm().stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        null
     )
 
     val timerCountByDate: StateFlow<List<DateCountPair>> = timerSessionRepository.getCountByDate().stateIn(
@@ -597,16 +606,34 @@ class HeartRateViewModel @Inject constructor(
     /**
      * Start timer countdown via foreground service
      */
-    fun startTimerService(totalSeconds: Int, tag: String?) {
+    fun startTimerService(totalSeconds: Int, tag: String?, alarmRecordId: Long? = null) {
         val intent = Intent(context, TimerCountdownService::class.java).apply {
             action = TimerCountdownService.ACTION_START
             putExtra(TimerCountdownService.EXTRA_TOTAL_SECONDS, totalSeconds)
             putExtra(TimerCountdownService.EXTRA_TAG, tag)
+            alarmRecordId?.let {
+                putExtra(TimerCountdownService.EXTRA_ALARM_RECORD_ID, it)
+            }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
         } else {
             context.startService(intent)
+        }
+    }
+
+    fun startAlarmService(durationSeconds: Int, label: String, targetTimeMillis: Long) {
+        viewModelScope.launch {
+            val cleanLabel = label.ifBlank { "智能闹钟" }
+            val alarmId = alarmRecordRepository.createAlarm(cleanLabel, targetTimeMillis, durationSeconds)
+            startTimerService(durationSeconds, "闹钟：$cleanLabel", alarmId)
+        }
+    }
+
+    fun cancelAlarm(alarmId: Long) {
+        viewModelScope.launch {
+            alarmRecordRepository.markCanceled(alarmId)
+            stopTimerService()
         }
     }
 

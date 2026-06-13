@@ -1,35 +1,30 @@
 package com.heartratemonitor.ui.screens
 
-private const val DEFAULT_TIMER_SECONDS = "40"
-private const val DEFAULT_TIMER_SECONDS_INT = 40
-
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.focus.onFocusEvent
-import androidx.compose.ui.focus.FocusState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import android.widget.Toast
@@ -39,27 +34,22 @@ import com.heartratemonitor.viewmodel.HeartRateViewModel
 import com.heartratemonitor.ble.ConnectionState
 import com.heartratemonitor.ble.AutoReconnectState
 import com.heartratemonitor.ui.screens.SettingsActivity
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.input.pointer.pointerInput
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import android.os.Build
 import android.Manifest
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.heartratemonitor.ble.BleScanner
+import com.heartratemonitor.data.entity.AlarmRecordEntity
 import com.heartratemonitor.service.TimerCountdownService
-import android.content.Intent
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.outlined.Notifications
-import com.google.accompanist.permissions.rememberPermissionState
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+
+private const val DEFAULT_TIMER_SECONDS = "40"
+private const val DEFAULT_TIMER_SECONDS_INT = 40
 
 /**
  * 主屏幕 - 心率监测
@@ -234,6 +224,81 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
     }
 }
 
+@Composable
+private fun ActiveAlarmCard(
+    alarm: AlarmRecordEntity,
+    onCancel: () -> Unit
+) {
+    var nowMillis by remember(alarm.id) { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(alarm.id) {
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000L)
+        }
+    }
+
+    val remainingSeconds = ((alarm.targetTimeMillis - nowMillis) / 1000L).coerceAtLeast(0L)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "当前闹钟",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.72f)
+                )
+                Text(
+                    text = alarm.label,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Text(
+                    text = "${formatAlarmTargetTime(alarm.targetTimeMillis)} · 剩余 ${formatAlarmRemainingDuration(remainingSeconds)}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.72f)
+                )
+            }
+            TextButton(onClick = onCancel) {
+                Text("取消")
+            }
+        }
+    }
+}
+
+private fun formatAlarmRemainingDuration(totalSeconds: Long): String {
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+
+    return when {
+        hours > 0L -> "${hours}小时${minutes.toString().padStart(2, '0')}分"
+        minutes > 0L -> "${minutes}分${seconds.toString().padStart(2, '0')}秒"
+        else -> "${seconds}秒"
+    }
+}
+
 /**
  * 倒计时状态（提升到 HeartRateScreen 以支持 Tab 切换后保持状态）
  */
@@ -274,6 +339,7 @@ fun RealTimeHeartRateScreen(
     val hasAutoConnectAttempted by viewModel.hasAutoConnectAttempted.collectAsState()
     val hasAutoConnectedDevice by viewModel.hasAutoConnectedDevice.collectAsState()
     val heartRateHistory by viewModel.heartRateHistory.collectAsState()
+    val activeAlarmRecord by viewModel.activeAlarmRecord.collectAsState()
 
     // 权限状态（Android 13+ 需要 POST_NOTIFICATIONS 才能显示前台服务通知）
     val permissionsState = rememberMultiplePermissionsState(
@@ -292,6 +358,7 @@ fun RealTimeHeartRateScreen(
 
     // 智能计时对话框状态
     var showVoiceInputDialog by remember { mutableStateOf(false) }
+    var showAlarmInputDialog by remember { mutableStateOf(false) }
 
     // Track previous state to avoid showing toast when switching tabs
     var previousState by remember { mutableStateOf(connectionState) }
@@ -367,18 +434,62 @@ fun RealTimeHeartRateScreen(
     }
 
     var showDeviceList by remember { mutableStateOf(false) }
+    var pendingDeviceScanAfterPermission by remember { mutableStateOf(false) }
+    val canOpenDeviceScan = connectionState !is ConnectionState.CONNECTED &&
+        connectionState !is ConnectionState.CONNECTING
+
+    fun openDeviceScan() {
+        if (!canOpenDeviceScan) return
+        if (permissionsState.allPermissionsGranted) {
+            showDeviceList = true
+        } else {
+            pendingDeviceScanAfterPermission = true
+            permissionsState.launchMultiplePermissionRequest()
+        }
+    }
+
+    LaunchedEffect(permissionsState.allPermissionsGranted, pendingDeviceScanAfterPermission, canOpenDeviceScan) {
+        if (!canOpenDeviceScan) {
+            pendingDeviceScanAfterPermission = false
+        } else if (pendingDeviceScanAfterPermission && permissionsState.allPermissionsGranted) {
+            pendingDeviceScanAfterPermission = false
+            showDeviceList = true
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // 心率显示卡片（紧凑版）
+        val scanHint = when {
+            connectionState is ConnectionState.CONNECTED -> null
+            connectionState is ConnectionState.CONNECTING -> null
+            !permissionsState.allPermissionsGranted -> "点击授权并扫描"
+            scanState is BleScanner.ScanState.SCANNING -> "正在扫描设备..."
+            else -> "点击扫描设备"
+        }
+
+        // 心率显示卡片；未连接时兼作扫描设备入口
         Card(
-            modifier = Modifier.size(180.dp),
+            modifier = Modifier
+                .size(190.dp)
+                .then(
+                    if (canOpenDeviceScan) {
+                        Modifier.clickable(onClick = ::openDeviceScan)
+                    } else {
+                        Modifier
+                    }
+                ),
             shape = RoundedCornerShape(24.dp),
+            border = if (canOpenDeviceScan) {
+                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
+            } else {
+                null
+            },
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             )
@@ -445,34 +556,26 @@ fun RealTimeHeartRateScreen(
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
-            }
-        }
 
-        // 控制按钮
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = {
-                    if (permissionsState.allPermissionsGranted) {
-                        showDeviceList = true
-                    } else {
-                        permissionsState.launchMultiplePermissionRequest()
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                enabled = connectionState !is ConnectionState.CONNECTED
-                    && connectionState !is ConnectionState.CONNECTING
-            ) {
-                Text(stringResource(R.string.scan_device))
+                if (scanHint != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = scanHint,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
 
         // 倒计时
         CountdownTimerCard(
             state = timerState,
-            onShowVoiceDialog = { showVoiceInputDialog = true }
+            onShowVoiceDialog = { showVoiceInputDialog = true },
+            onShowAlarmDialog = { showAlarmInputDialog = true },
+            activeAlarm = activeAlarmRecord,
+            onCancelAlarm = { alarm -> viewModel.cancelAlarm(alarm.id) }
         )
     }
 
@@ -513,7 +616,7 @@ fun RealTimeHeartRateScreen(
     // 语音输入对话框
     if (showVoiceInputDialog) {
         VoiceInputDialog(
-            apiKey = siliconFlowApiKey ?: "",
+            apiKey = siliconFlowApiKey,
             onDismiss = { showVoiceInputDialog = false },
             onResult = { result ->
                 showVoiceInputDialog = false
@@ -535,6 +638,63 @@ fun RealTimeHeartRateScreen(
             }
         )
     }
+
+    if (showAlarmInputDialog) {
+        SmartAlarmInputDialog(
+            apiKey = siliconFlowApiKey,
+            onDismiss = { showAlarmInputDialog = false },
+            onResult = { result ->
+                showAlarmInputDialog = false
+                result?.let { alarmResult ->
+                    val targetTimeMillis = resolveAlarmTargetMillis(alarmResult)
+                    val secondsUntilAlarm = (((targetTimeMillis - System.currentTimeMillis()) + 999L) / 1000L)
+                        .coerceAtLeast(1L)
+                        .coerceAtMost(Int.MAX_VALUE.toLong())
+                        .toInt()
+                    val alarmTag = "闹钟：${alarmResult.eventName.ifBlank { "智能闹钟" }}"
+
+                    timerState.onTagInputChange(alarmTag)
+                    timerState.onInputMinutesChange((secondsUntilAlarm / 60).toString())
+                    timerState.onInputSecondsChange((secondsUntilAlarm % 60).toString())
+                    viewModel.startAlarmService(
+                        durationSeconds = secondsUntilAlarm,
+                        label = alarmResult.eventName,
+                        targetTimeMillis = targetTimeMillis
+                    )
+
+                    Toast.makeText(
+                        context,
+                        "已设置闹钟: ${alarmResult.eventName}, ${formatAlarmTargetTime(targetTimeMillis)}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        )
+    }
+}
+
+private fun resolveAlarmTargetMillis(
+    alarmResult: VoiceAlarmResult,
+    nowMillis: Long = System.currentTimeMillis()
+): Long {
+    val calendar = Calendar.getInstance().apply {
+        timeInMillis = nowMillis
+        add(Calendar.DATE, alarmResult.dateOffsetDays)
+        set(Calendar.HOUR_OF_DAY, alarmResult.hour)
+        set(Calendar.MINUTE, alarmResult.minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+
+    if (alarmResult.dateOffsetDays == 0 && calendar.timeInMillis <= nowMillis) {
+        calendar.add(Calendar.DATE, 1)
+    }
+
+    return calendar.timeInMillis
+}
+
+private fun formatAlarmTargetTime(targetTimeMillis: Long): String {
+    return SimpleDateFormat("M月d日 HH:mm", Locale.CHINA).format(Date(targetTimeMillis))
 }
 
 /**
@@ -545,7 +705,10 @@ fun RealTimeHeartRateScreen(
 @Composable
 fun CountdownTimerCard(
     state: TimerState,
-    onShowVoiceDialog: () -> Unit
+    onShowVoiceDialog: () -> Unit,
+    onShowAlarmDialog: () -> Unit,
+    activeAlarm: AlarmRecordEntity?,
+    onCancelAlarm: (AlarmRecordEntity) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Card(
@@ -676,7 +839,34 @@ fun CountdownTimerCard(
         modifier = Modifier.fillMaxWidth(),
         enabled = !state.isRunning
     ) {
+        Icon(
+            imageVector = Icons.Default.Mic,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
         Text("智能计时", fontSize = 14.sp)
+    }
+
+    OutlinedButton(
+        onClick = onShowAlarmDialog,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !state.isRunning
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Notifications,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text("智能闹钟", fontSize = 14.sp)
+    }
+
+    activeAlarm?.let { alarm ->
+        ActiveAlarmCard(
+            alarm = alarm,
+            onCancel = { onCancelAlarm(alarm) }
+        )
     }
     }
 }
