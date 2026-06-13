@@ -14,9 +14,10 @@ export default {
     // GET: retrieve all data for restore
     if (request.method === "GET") {
       try {
-        const [hrResult, tsResult] = await Promise.all([
+        const [hrResult, tsResult, alarmResult] = await Promise.all([
           env.DB.prepare("SELECT timestamp, heart_rate FROM heart_rates ORDER BY timestamp ASC").all(),
           env.DB.prepare("SELECT timestamp, duration_seconds, tag FROM timer_sessions ORDER BY timestamp ASC").all(),
+          env.DB.prepare("SELECT created_at, target_time_millis, duration_seconds, label, status, completed_at FROM alarm_records ORDER BY created_at ASC").all(),
         ]);
 
         return new Response(
@@ -24,6 +25,7 @@ export default {
             success: true,
             heartRates: hrResult.results,
             timerSessions: tsResult.results,
+            alarmRecords: alarmResult.results,
           }),
           { status: 200, headers: corsHeaders }
         );
@@ -39,10 +41,11 @@ export default {
     if (request.method === "POST") {
       try {
         const body = await request.json();
-        const { heartRates = [], timerSessions = [] } = body;
+        const { heartRates = [], timerSessions = [], alarmRecords = [] } = body;
 
         let syncedHR = 0;
         let syncedTS = 0;
+        let syncedAlarm = 0;
 
         if (heartRates.length > 0) {
           const stmt = env.DB.prepare(
@@ -68,8 +71,26 @@ export default {
           syncedTS = timerSessions.length;
         }
 
+        if (alarmRecords.length > 0) {
+          const stmt = env.DB.prepare(
+            `INSERT INTO alarm_records (created_at, target_time_millis, duration_seconds, label, status, completed_at)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(created_at) DO UPDATE SET
+               target_time_millis = excluded.target_time_millis,
+               duration_seconds = excluded.duration_seconds,
+               label = excluded.label,
+               status = excluded.status,
+               completed_at = excluded.completed_at`
+          );
+          const batch = alarmRecords.map((r) =>
+            stmt.bind(r.createdAt, r.targetTimeMillis, r.durationSeconds, r.label, r.status, r.completedAt ?? null)
+          );
+          await env.DB.batch(batch);
+          syncedAlarm = alarmRecords.length;
+        }
+
         return new Response(
-          JSON.stringify({ success: true, syncedHeartRates: syncedHR, syncedTimerSessions: syncedTS }),
+          JSON.stringify({ success: true, syncedHeartRates: syncedHR, syncedTimerSessions: syncedTS, syncedAlarmRecords: syncedAlarm }),
           { status: 200, headers: corsHeaders }
         );
       } catch (e) {
