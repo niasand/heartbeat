@@ -831,7 +831,9 @@ fun CountdownTimerCard(
             value = state.tagInput,
             onValueChange = {},
             readOnly = true,
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = !state.isRunning)
+                .fillMaxWidth(),
             singleLine = true,
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, textAlign = TextAlign.Center),
             enabled = !state.isRunning,
