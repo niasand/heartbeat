@@ -69,6 +69,8 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
         private val HEARTBEAT_SOUND_KEY = booleanPreferencesKey("heartbeat_sound_enabled")
         // 硅基流动 API Key（用于语音计时解析）
         private val SILICONFLOW_API_KEY = stringPreferencesKey("siliconflow_api_key")
+        // 最近使用的倒计时标签（逗号分隔，最多 5 个）
+        private val RECENT_TIMER_TAGS_KEY = stringPreferencesKey("recent_timer_tags")
 
         // 默认值
         const val DEFAULT_HIGH_THRESHOLD = 180
@@ -131,6 +133,17 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
      */
     val siliconFlowApiKeyFlow: Flow<String?> = dataStore.data.map { preferences ->
         preferences[SILICONFLOW_API_KEY]
+    }
+
+    /**
+     * 获取最近使用的倒计时标签列表（逗号分隔解析）
+     */
+    val recentTimerTagsFlow: Flow<List<String>> = dataStore.data.map { preferences ->
+        preferences[RECENT_TIMER_TAGS_KEY]
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?: emptyList()
     }
 
     init {
@@ -225,6 +238,15 @@ class PreferencesManager @Inject constructor(@ApplicationContext context: Contex
     suspend fun saveSiliconFlowApiKey(value: String) {
         dataStore.edit { preferences ->
             preferences[SILICONFLOW_API_KEY] = value
+        }
+    }
+
+    /**
+     * 保存最近使用的倒计时标签列表（逗号分隔序列化）
+     */
+    suspend fun saveRecentTimerTags(tags: List<String>) {
+        dataStore.edit { preferences ->
+            preferences[RECENT_TIMER_TAGS_KEY] = tags.joinToString(",")
         }
     }
 }

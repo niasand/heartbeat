@@ -15,6 +15,10 @@ class AlarmRecordRepository @Inject constructor(
         return alarmRecordDao.getActiveAlarm()
     }
 
+    fun getAlarmsAfter(after: Long): Flow<List<AlarmRecordEntity>> {
+        return alarmRecordDao.getAfter(after)
+    }
+
     suspend fun createAlarm(label: String, targetTimeMillis: Long, durationSeconds: Int): Long {
         alarmRecordDao.updateScheduledStatus(AlarmRecordStatus.CANCELED, System.currentTimeMillis())
         return alarmRecordDao.insert(
@@ -33,5 +37,9 @@ class AlarmRecordRepository @Inject constructor(
 
     suspend fun markCanceled(id: Long) {
         alarmRecordDao.updateStatus(id, AlarmRecordStatus.CANCELED, System.currentTimeMillis())
+    }
+
+    suspend fun deleteAlarm(createdAt: Long) {
+        alarmRecordDao.deleteByCreatedAt(createdAt)
     }
 }

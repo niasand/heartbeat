@@ -3,6 +3,7 @@ package com.heartratemonitor.di
 import com.heartratemonitor.data.sync.SyncApiClient
 import com.heartratemonitor.data.sync.SyncRepository
 import com.heartratemonitor.data.sync.LocalBackupManager
+import com.heartratemonitor.data.dao.AlarmRecordDao
 import com.heartratemonitor.data.dao.HeartRateDao
 import com.heartratemonitor.data.dao.TimerSessionDao
 import com.heartratemonitor.data.pref.PreferencesManager
@@ -27,10 +28,11 @@ object NetworkModule {
     fun provideSyncRepository(
         heartRateDao: HeartRateDao,
         timerSessionDao: TimerSessionDao,
+        alarmRecordDao: AlarmRecordDao,
         syncApiClient: SyncApiClient,
         preferencesManager: PreferencesManager,
         localBackupManager: LocalBackupManager
     ): SyncRepository {
-        return SyncRepository(heartRateDao, timerSessionDao, syncApiClient, preferencesManager, localBackupManager)
+        return SyncRepository(heartRateDao, timerSessionDao, alarmRecordDao, syncApiClient, preferencesManager, localBackupManager)
     }
 }

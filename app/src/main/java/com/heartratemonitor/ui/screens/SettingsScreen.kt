@@ -725,7 +725,10 @@ fun DataSyncCard(
                         color = Color(0xFFE8F5E9)
                     ) {
                         Text(
-                            text = "同步成功！心率 ${state.syncedHeartRates} 条，计时 ${state.syncedTimerSessions} 条",
+                            text = buildString {
+                                append("同步成功！心率 ${state.syncedHeartRates} 条，计时 ${state.syncedTimerSessions} 条")
+                                if (state.syncedAlarmRecords > 0) append("，闹钟 ${state.syncedAlarmRecords} 条")
+                            },
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF2E7D32)
@@ -757,7 +760,10 @@ fun DataSyncCard(
                         color = Color(0xFFE8F5E9)
                     ) {
                         Text(
-                            text = "恢复成功！心率 ${state.restoredHeartRates} 条，计时 ${state.restoredTimerSessions} 条",
+                            text = buildString {
+                                append("恢复成功！心率 ${state.restoredHeartRates} 条，计时 ${state.restoredTimerSessions} 条")
+                                if (state.restoredAlarmRecords > 0) append("，闹钟 ${state.restoredAlarmRecords} 条")
+                            },
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF2E7D32)

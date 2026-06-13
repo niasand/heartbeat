@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import android.widget.Toast
+import com.heartratemonitor.ui.components.MiniHeartRateChart
 import com.heartratemonitor.R
 import com.heartratemonitor.ui.theme.AppColors
 import com.heartratemonitor.viewmodel.HeartRateViewModel
@@ -195,12 +196,14 @@ fun HeartRateScreen(viewModel: HeartRateViewModel = viewModel()) {
                                         viewModel.resumeTimerService()
                                     } else if (inputComputedTotal > 0) {
                                         viewModel.startTimerService(inputComputedTotal, timerTagInput.ifBlank { null })
+                                        timerTagInput.ifBlank { null }?.let { viewModel.addRecentTimerTag(it) }
                                     }
                                 }
                                 wantRunning -> {
                                     // IDLE or COMPLETED — start new timer
                                     if (inputComputedTotal > 0) {
                                         viewModel.startTimerService(inputComputedTotal, timerTagInput.ifBlank { null })
+                                        timerTagInput.ifBlank { null }?.let { viewModel.addRecentTimerTag(it) }
                                     }
                                 }
                                 else -> {
@@ -331,6 +334,8 @@ fun RealTimeHeartRateScreen(
 ) {
     val context = LocalContext.current
     val currentHeartRate by viewModel.currentHeartRate.collectAsState()
+    val recentHeartRates by viewModel.recentHeartRates.collectAsState()
+    val recentTimerTags by viewModel.recentTimerTags.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val highThreshold by viewModel.highThreshold.collectAsState()
     val lowThreshold by viewModel.lowThreshold.collectAsState()
@@ -538,6 +543,17 @@ fun RealTimeHeartRateScreen(
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
 
+                // 迷你心率折线图（最近样本），样本不足时占位不绘制
+                if (recentHeartRates.size >= 2) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    MiniHeartRateChart(
+                        samples = recentHeartRates,
+                        modifier = Modifier
+                            .fillMaxWidth(0.75f)
+                            .height(28.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // 连接状态
@@ -575,7 +591,8 @@ fun RealTimeHeartRateScreen(
             onShowVoiceDialog = { showVoiceInputDialog = true },
             onShowAlarmDialog = { showAlarmInputDialog = true },
             activeAlarm = activeAlarmRecord,
-            onCancelAlarm = { alarm -> viewModel.cancelAlarm(alarm.id) }
+            onCancelAlarm = { alarm -> viewModel.cancelAlarm(alarm.id) },
+            tags = recentTimerTags
         )
     }
 
@@ -708,7 +725,8 @@ fun CountdownTimerCard(
     onShowVoiceDialog: () -> Unit,
     onShowAlarmDialog: () -> Unit,
     activeAlarm: AlarmRecordEntity?,
-    onCancelAlarm: (AlarmRecordEntity) -> Unit
+    onCancelAlarm: (AlarmRecordEntity) -> Unit,
+    tags: List<String> = listOf("平板支撑", "煮鸡蛋", "跳绳", "烧水", "冥想", "拉伸")
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Card(
@@ -732,18 +750,31 @@ fun CountdownTimerCard(
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
             )
 
-            // 倒计时显示 MM:SS
+            // 倒计时显示 MM:SS（左）+ 开始/暂停按钮（右），同一行作为主路径
             val minutes = state.remainingSeconds / 60
             val seconds = state.remainingSeconds % 60
-            Text(
-                text = "%02d:%02d".format(minutes, seconds),
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (state.remainingSeconds == 0) AppColors.HeartRateCritical
-                    else MaterialTheme.colorScheme.onSecondaryContainer
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "%02d:%02d".format(minutes, seconds),
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state.remainingSeconds == 0) AppColors.HeartRateCritical
+                        else MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { state.onIsRunningChange(!state.isRunning) },
+                    enabled = state.remainingSeconds > 0
+                ) {
+                    Text(if (state.isRunning) "暂停" else "开始")
+                }
+            }
 
-            // 输入框在左，开始按钮最后
+            // 单个分钟数输入（合并原分/秒双框），秒数恒为 0
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -753,56 +784,32 @@ fun CountdownTimerCard(
                     onValueChange = { text ->
                         if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..999 } == true)) {
                             state.onInputMinutesChange(text)
+                            // 单输入框模式下秒数恒为 0，避免残留默认值污染总时长
+                            state.onInputSecondsChange("0")
                             if (!state.isRunning) {
                                 val mins = text.toIntOrNull() ?: 0
-                                val secs = state.inputSeconds.toIntOrNull() ?: 0
-                                val total = mins * 60 + secs
-                                if (total > 0) { state.onTotalSecondsChange(total); state.onRemainingSecondsChange(total) }
+                                if (mins > 0) {
+                                    val total = mins * 60
+                                    state.onTotalSecondsChange(total)
+                                    state.onRemainingSecondsChange(total)
+                                }
                             }
                         }
                     },
-                    modifier = Modifier
-                        .width(64.dp),
+                    modifier = Modifier.width(80.dp),
                     singleLine = true,
                     enabled = !state.isRunning,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
                 )
-                Text("分", fontSize = 14.sp)
-                OutlinedTextField(
-                    value = state.inputSeconds,
-                    onValueChange = { text ->
-                        if (text.isEmpty() || (text.all { it.isDigit() } && text.toIntOrNull()?.let { it in 0..59 } == true)) {
-                            state.onInputSecondsChange(text)
-                            if (!state.isRunning) {
-                                val mins = state.inputMinutes.toIntOrNull() ?: 0
-                                val secs = text.toIntOrNull() ?: 0
-                                val total = mins * 60 + secs
-                                if (total > 0) { state.onTotalSecondsChange(total); state.onRemainingSecondsChange(total) }
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .width(64.dp),
-                    singleLine = true,
-                    enabled = !state.isRunning,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, textAlign = TextAlign.Center)
-                )
-                Text("秒", fontSize = 14.sp)
-                Button(
-                    onClick = { state.onIsRunningChange(!state.isRunning) },
-                    enabled = state.remainingSeconds > 0
-                ) {
-                    Text(if (state.isRunning) "暂停" else "开始")
-                }
+                Text("分钟", fontSize = 14.sp)
             }
         }
     }
 
-    // 标签下拉框（Card 外部）
+    // 标签下拉框（Card 外部），选项来自最近使用记录
     var tagExpanded by remember { mutableStateOf(false) }
-    val tagOptions = listOf("平板支撑", "煮鸡蛋", "跳绳", "烧水", "冥想", "拉伸")
+    val tagOptions = tags
     ExposedDropdownMenuBox(
         expanded = tagExpanded && !state.isRunning,
         onExpandedChange = { if (!state.isRunning) tagExpanded = it }
@@ -833,33 +840,38 @@ fun CountdownTimerCard(
         }
     }
 
-    // 智能计时按钮
-    Button(
-        onClick = onShowVoiceDialog,
+    // 智能计时 / 智能闹钟：同级次级入口，并排各占一半，避免与卡片内「开始」主按钮抢视觉权重
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        enabled = !state.isRunning
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(
-            imageVector = Icons.Default.Mic,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text("智能计时", fontSize = 14.sp)
-    }
+        OutlinedButton(
+            onClick = onShowVoiceDialog,
+            modifier = Modifier.weight(1f),
+            enabled = !state.isRunning
+        ) {
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("智能计时", fontSize = 14.sp)
+        }
 
-    OutlinedButton(
-        onClick = onShowAlarmDialog,
-        modifier = Modifier.fillMaxWidth(),
-        enabled = !state.isRunning
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Notifications,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text("智能闹钟", fontSize = 14.sp)
+        OutlinedButton(
+            onClick = onShowAlarmDialog,
+            modifier = Modifier.weight(1f),
+            enabled = !state.isRunning
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Notifications,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("智能闹钟", fontSize = 14.sp)
+        }
     }
 
     activeAlarm?.let { alarm ->

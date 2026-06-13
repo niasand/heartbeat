@@ -5,7 +5,8 @@ package com.heartratemonitor.data.sync
  */
 data class SyncRequest(
     val heartRates: List<HeartRateRecord>,
-    val timerSessions: List<TimerSessionRecord>
+    val timerSessions: List<TimerSessionRecord>,
+    val alarmRecords: List<AlarmRecordRecord> = emptyList()
 )
 
 data class HeartRateRecord(
@@ -19,6 +20,15 @@ data class TimerSessionRecord(
     val tag: String? = null
 )
 
+data class AlarmRecordRecord(
+    val createdAt: Long,
+    val targetTimeMillis: Long,
+    val durationSeconds: Int,
+    val label: String,
+    val status: String,
+    val completedAt: Long? = null
+)
+
 /**
  * Sync response from Cloudflare Workers
  */
@@ -26,7 +36,8 @@ data class SyncResponse(
     val success: Boolean,
     val message: String? = null,
     val syncedHeartRates: Int = 0,
-    val syncedTimerSessions: Int = 0
+    val syncedTimerSessions: Int = 0,
+    val syncedAlarmRecords: Int = 0
 )
 
 /**
@@ -36,6 +47,7 @@ data class SyncResult(
     val success: Boolean,
     val syncedHeartRates: Int = 0,
     val syncedTimerSessions: Int = 0,
+    val syncedAlarmRecords: Int = 0,
     val error: String? = null
 )
 
@@ -46,6 +58,7 @@ data class FetchResponse(
     val success: Boolean,
     val heartRates: List<FetchedHeartRate> = emptyList(),
     val timerSessions: List<FetchedTimerSession> = emptyList(),
+    val alarmRecords: List<FetchedAlarmRecord> = emptyList(),
     val message: String? = null
 )
 
@@ -60,6 +73,15 @@ data class FetchedTimerSession(
     val tag: String? = null
 )
 
+data class FetchedAlarmRecord(
+    val created_at: Long,
+    val target_time_millis: Long,
+    val duration_seconds: Int,
+    val label: String,
+    val status: String,
+    val completed_at: Long? = null
+)
+
 /**
  * Restore result for UI layer
  */
@@ -67,14 +89,18 @@ data class RestoreResult(
     val success: Boolean,
     val restoredHeartRates: Int = 0,
     val restoredTimerSessions: Int = 0,
+    val restoredAlarmRecords: Int = 0,
     val error: String? = null
 )
 
 /**
  * Delete request body for removing records from cloud
+ * timestamps: timer_sessions rows keyed by timestamp
+ * alarmCreatedAts: alarm_records rows keyed by created_at
  */
 data class DeleteRequest(
-    val timestamps: List<Long>
+    val timestamps: List<Long> = emptyList(),
+    val alarmCreatedAts: List<Long> = emptyList()
 )
 
 data class DeleteResponse(
