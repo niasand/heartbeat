@@ -17,3 +17,27 @@
 - **Learnings:**
   - Ralph 模式的 progress.txt 适合有 prd.json 工作流的项目，每次迭代追加经验供后续 AI 实例参考
   - Codebase Patterns 段放在最顶部，因为 AI 读文件时优先看到前面的内容
+
+---
+
+## 2026-06-13 - 闹钟记录历史筛选(P1) + 云同步/备份接入(P2)
+- What:
+  - P1: 计时历史页加 segmented「计时记录/闹钟记录」切换，复用时间段筛选，展示 alarm_records 历史(fired/canceled/scheduled 三态 chip)
+  - P2: alarm_records 接入 sync/backup 管线(本地 JSON 备份 + 云同步 DTO)，去重键用 created_at
+- Files changed:
+  - data/dao/AlarmRecordDao.kt (+getAfter Flow, +getAllSync/getAllTimestamps/getAfterSync/insertAll)
+  - data/repository/AlarmRecordRepository.kt (+getAlarmsAfter)
+  - viewmodel/HeartRateViewModel.kt (+HistoryTab enum, +_alarmsInTimeRange, SyncState/RestoreState.SUCCESS 加 alarm 计数)
+  - ui/screens/TimerHistoryScreen.kt (重构: segmented + TimerHistoryContent + AlarmHistoryContent + AlarmStatusChip)
+  - data/sync/SyncModels.kt (+AlarmRecordRecord/FetchedAlarmRecord, 4 处加 alarm 字段)
+  - data/sync/SyncRepository.kt (构造+alarmRecordDao, syncToCloud/restoreFromCloud/mergeAndInsert/createLocalBackup 五处接入)
+  - data/sync/LocalBackupManager.kt (+alarm_records.json, createBackup/readLocalBackup/LocalBackupData)
+  - di/NetworkModule.kt (provideSyncRepository 加 AlarmRecordDao 参数)
+  - ui/screens/SettingsScreen.kt (同步/恢复 Toast 文案带 alarm 计数)
+- **Learnings:**
+  - Pattern: SyncRepository 是手动 @Provides（非纯构造注入），改构造签名必须同步改 NetworkModule.provideSyncRepository，否则编译报参数顺序错配
+  - Pattern: 新增同步表三触点 = DAO(getAllSync/getAllTimestamps/getAfterSync/insertAll) → SyncModels DTO(push+fetch两套,fetch用snake_case) → SyncRepository(syncToCloud+mergeAndInsert+createLocalBackup)
+  - Pattern: Flow 查询(P1 getAfter) 和 suspend 快照查询(P2 getAfterSync) 必须命名区分，避免签名歧义
+  - Gotcha: LocalBackupManager 旧备份无 alarm 文件，hasLocalBackup/readLocalBackup 必须容错(不强制 alarm 文件存在)，否则老用户恢复崩溃
+  - Gotcha: SyncApiClient 用 Gson 反序列化，DTO 字段加默认值即自动兼容旧 Worker(忽略 alarmRecords 不崩)，无需改 client 代码——这是"用户稍后自改 Worker"能成立的桥梁
+  - Database 不动: 不加列/不加表/不加 migration，version 仍为 4

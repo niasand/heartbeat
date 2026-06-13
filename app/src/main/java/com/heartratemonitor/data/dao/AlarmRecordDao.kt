@@ -21,4 +21,21 @@ interface AlarmRecordDao {
 
     @Query("UPDATE alarm_records SET status = :status, completed_at = :completedAt WHERE status = 'scheduled'")
     suspend fun updateScheduledStatus(status: String, completedAt: Long?)
+
+    @Query("SELECT * FROM alarm_records WHERE created_at >= :after ORDER BY created_at DESC")
+    fun getAfter(after: Long): Flow<List<AlarmRecordEntity>>
+
+    // ---- P2 sync helpers (suspend, snapshot reads) ----
+
+    @Query("SELECT * FROM alarm_records")
+    suspend fun getAllSync(): List<AlarmRecordEntity>
+
+    @Query("SELECT created_at FROM alarm_records")
+    suspend fun getAllTimestamps(): List<Long>
+
+    @Query("SELECT * FROM alarm_records WHERE created_at > :after")
+    suspend fun getAfterSync(after: Long): List<AlarmRecordEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(alarms: List<AlarmRecordEntity>)
 }

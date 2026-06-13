@@ -173,6 +173,14 @@ class HeartRateViewModel @Inject constructor(
     private val _timerFilterTag = MutableStateFlow<String?>(null)
     val timerFilterTag: StateFlow<String?> = _timerFilterTag
 
+    // History page top-level tab: timer sessions vs alarm records
+    private val _historyTab = MutableStateFlow(HistoryTab.TIMER)
+    val historyTab: StateFlow<HistoryTab> = _historyTab
+
+    // Alarm records filtered by the same time range as timer sessions
+    private val _alarmsInTimeRange = MutableStateFlow<List<AlarmRecordEntity>>(emptyList())
+    val alarmsInTimeRange: StateFlow<List<AlarmRecordEntity>> = _alarmsInTimeRange
+
     // Time-range filtered sessions (before tag filter)
     private val _sessionsInTimeRange = MutableStateFlow<List<TimerSessionEntity>>(emptyList())
     val sessionsInTimeRange: StateFlow<List<TimerSessionEntity>> = _sessionsInTimeRange
@@ -230,7 +238,7 @@ class HeartRateViewModel @Inject constructor(
     sealed class SyncState {
         data object IDLE : SyncState()
         data object SYNCING : SyncState()
-        data class SUCCESS(val syncedHeartRates: Int, val syncedTimerSessions: Int) : SyncState()
+        data class SUCCESS(val syncedHeartRates: Int, val syncedTimerSessions: Int, val syncedAlarmRecords: Int = 0) : SyncState()
         data class ERROR(val message: String) : SyncState()
     }
 
@@ -240,7 +248,7 @@ class HeartRateViewModel @Inject constructor(
     sealed class RestoreState {
         data object IDLE : RestoreState()
         data object RESTORING : RestoreState()
-        data class SUCCESS(val restoredHeartRates: Int, val restoredTimerSessions: Int) : RestoreState()
+        data class SUCCESS(val restoredHeartRates: Int, val restoredTimerSessions: Int, val restoredAlarmRecords: Int = 0) : RestoreState()
         data class ERROR(val message: String) : RestoreState()
     }
 
@@ -251,6 +259,8 @@ class HeartRateViewModel @Inject constructor(
         data object MONITORING : ServiceState()
         data class ERROR(val message: String) : ServiceState()
     }
+
+    enum class HistoryTab { TIMER, ALARM }
 
     data class HeartRateStats(
         val avg: Double,
@@ -310,6 +320,16 @@ class HeartRateViewModel @Inject constructor(
                 val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
                 timerSessionRepository.getSessionsAfter(afterTimestamp).collect { sessions ->
                     _sessionsInTimeRange.value = sessions
+                }
+            }
+        }
+
+        // Load alarm records filtered by the same time range (created_at based)
+        viewModelScope.launch {
+            _timerFilterDays.collectLatest { days ->
+                val afterTimestamp = System.currentTimeMillis() - days.toLong() * 24 * 3600 * 1000
+                alarmRecordRepository.getAlarmsAfter(afterTimestamp).collect { alarms ->
+                    _alarmsInTimeRange.value = alarms
                 }
             }
         }
@@ -453,6 +473,13 @@ class HeartRateViewModel @Inject constructor(
     }
 
     /**
+     * Switch history page between timer sessions and alarm records
+     */
+    fun setHistoryTab(tab: HistoryTab) {
+        _historyTab.value = tab
+    }
+
+    /**
      * Delete a timer session by timestamp, both local and cloud.
      * Local deletion first for instant UI feedback.
      */
@@ -508,7 +535,7 @@ class HeartRateViewModel @Inject constructor(
             _restoreState.value = RestoreState.IDLE
             val result = syncRepository.syncToCloud()
             _syncState.value = if (result.success) {
-                SyncState.SUCCESS(result.syncedHeartRates, result.syncedTimerSessions)
+                SyncState.SUCCESS(result.syncedHeartRates, result.syncedTimerSessions, result.syncedAlarmRecords)
             } else {
                 SyncState.ERROR(result.error ?: "Sync failed")
             }
@@ -524,7 +551,7 @@ class HeartRateViewModel @Inject constructor(
             _syncState.value = SyncState.IDLE
             val result = syncRepository.restoreFromBackup()
             _restoreState.value = if (result.success) {
-                RestoreState.SUCCESS(result.restoredHeartRates, result.restoredTimerSessions)
+                RestoreState.SUCCESS(result.restoredHeartRates, result.restoredTimerSessions, result.restoredAlarmRecords)
             } else {
                 RestoreState.ERROR(result.error ?: "Restore failed")
             }

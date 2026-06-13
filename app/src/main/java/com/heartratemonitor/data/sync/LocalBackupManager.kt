@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.heartratemonitor.data.entity.AlarmRecordEntity
 import com.heartratemonitor.data.entity.HeartRateEntity
 import com.heartratemonitor.data.entity.TimerSessionEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -31,6 +32,9 @@ class LocalBackupManager @Inject constructor(
     private val timerSessionBackupFile: File
         get() = File(backupDir, "timer_sessions.json")
 
+    private val alarmRecordBackupFile: File
+        get() = File(backupDir, "alarm_records.json")
+
     private val backupMetaFile: File
         get() = File(backupDir, "meta.json")
 
@@ -42,6 +46,7 @@ class LocalBackupManager @Inject constructor(
     data class LocalBackupData(
         val heartRates: List<HeartRateEntity>,
         val timerSessions: List<TimerSessionEntity>,
+        val alarms: List<AlarmRecordEntity>,
         val backupTime: Long
     )
 
@@ -50,13 +55,15 @@ class LocalBackupManager @Inject constructor(
      */
     suspend fun createBackup(
         heartRates: List<HeartRateEntity>,
-        timerSessions: List<TimerSessionEntity>
+        timerSessions: List<TimerSessionEntity>,
+        alarms: List<AlarmRecordEntity>
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             gson.toJson(heartRates).also { heartRateBackupFile.writeText(it) }
             gson.toJson(timerSessions).also { timerSessionBackupFile.writeText(it) }
+            gson.toJson(alarms).also { alarmRecordBackupFile.writeText(it) }
             gson.toJson(BackupMeta(System.currentTimeMillis())).also { backupMetaFile.writeText(it) }
-            Log.d(TAG, "Local backup created: ${heartRates.size} HR, ${timerSessions.size} sessions")
+            Log.d(TAG, "Local backup created: ${heartRates.size} HR, ${timerSessions.size} sessions, ${alarms.size} alarms")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Local backup failed", e)
@@ -66,6 +73,7 @@ class LocalBackupManager @Inject constructor(
 
     /**
      * 检查本地备份是否存在
+     * alarm_records.json 可能不存在（旧版本备份），不强制要求，保持向后兼容
      */
     fun hasLocalBackup(): Boolean {
         return heartRateBackupFile.exists() && timerSessionBackupFile.exists()
@@ -102,12 +110,19 @@ class LocalBackupManager @Inject constructor(
 
             val hrType = object : TypeToken<List<HeartRateEntity>>() {}.type
             val tsType = object : TypeToken<List<TimerSessionEntity>>() {}.type
+            val alarmType = object : TypeToken<List<AlarmRecordEntity>>() {}.type
 
             val heartRates: List<HeartRateEntity> = gson.fromJson(heartRateBackupFile.readText(), hrType) ?: emptyList()
             val timerSessions: List<TimerSessionEntity> = gson.fromJson(timerSessionBackupFile.readText(), tsType) ?: emptyList()
+            // alarm 文件可能不存在（旧版本备份），按空列表处理
+            val alarms: List<AlarmRecordEntity> = if (alarmRecordBackupFile.exists()) {
+                gson.fromJson(alarmRecordBackupFile.readText(), alarmType) ?: emptyList()
+            } else {
+                emptyList()
+            }
             val backupTime = getBackupTimestamp() ?: 0L
 
-            LocalBackupData(heartRates, timerSessions, backupTime)
+            LocalBackupData(heartRates, timerSessions, alarms, backupTime)
         } catch (e: Exception) {
             Log.e(TAG, "Read local backup failed", e)
             null

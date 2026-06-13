@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,17 +42,34 @@ private val filterOptions = listOf(
 @Composable
 fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
     val sessions by viewModel.filteredTimerSessions.collectAsState()
-    val context = LocalContext.current
     val countByDate by viewModel.filteredTimerCountByDate.collectAsState()
     val countByMonth by viewModel.filteredTimerCountByMonth.collectAsState()
     val currentFilter by viewModel.timerFilterDays.collectAsState()
     val currentTagFilter by viewModel.timerFilterTag.collectAsState()
     val allSessionsInRange by viewModel.sessionsInTimeRange.collectAsState()
+    val historyTab by viewModel.historyTab.collectAsState()
+    val alarms by viewModel.alarmsInTimeRange.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Filter tabs
+        // Top-level segmented: timer sessions vs alarm records
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabLabel("计时记录", historyTab == HeartRateViewModel.HistoryTab.TIMER) {
+                viewModel.setHistoryTab(HeartRateViewModel.HistoryTab.TIMER)
+            }
+            tabLabel("闹钟记录", historyTab == HeartRateViewModel.HistoryTab.ALARM) {
+                viewModel.setHistoryTab(HeartRateViewModel.HistoryTab.ALARM)
+            }
+        }
+
+        // Filter tabs (shared by both views)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -71,137 +89,263 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
             }
         }
 
-        // Bar chart — switch data source based on filter range
-        val isMonthly = currentFilter >= 180
-        TimerBarChart(
-            countByDate = if (isMonthly) countByMonth else countByDate,
-            isMonthly = isMonthly,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        )
+        when (historyTab) {
+            HeartRateViewModel.HistoryTab.TIMER -> TimerHistoryContent(
+                sessions = sessions,
+                currentFilter = currentFilter,
+                countByDate = countByDate,
+                countByMonth = countByMonth,
+                allSessionsInRange = allSessionsInRange,
+                currentTagFilter = currentTagFilter,
+                onTagSelected = viewModel::setTimerFilterTag,
+                onDeleteSession = viewModel::deleteTimerSession
+            )
+            HeartRateViewModel.HistoryTab.ALARM -> AlarmHistoryContent(alarms = alarms)
+        }
+    }
+}
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+@Composable
+private fun tabLabel(text: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = text,
+        fontSize = 15.sp,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        color = if (selected) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.clickable { onClick() }
+    )
+}
 
-        // Table header
-        val availableTags = allSessionsInRange.mapNotNull { it.tag }.distinct()
-        var tagMenuExpanded by remember { mutableStateOf(false) }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("日期", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f))
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text(
-                    text = if (currentTagFilter.isNullOrBlank()) "计时事件" else "计时事件($currentTagFilter)",
-                    fontSize = 12.sp,
-                    fontWeight = if (currentTagFilter != null) FontWeight.Bold else FontWeight.Normal,
-                    color = if (currentTagFilter != null) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.clickable { tagMenuExpanded = true }
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun TimerHistoryContent(
+    sessions: List<com.heartratemonitor.data.entity.TimerSessionEntity>,
+    currentFilter: Int,
+    countByDate: List<com.heartratemonitor.data.dao.DateCountPair>,
+    countByMonth: List<com.heartratemonitor.data.dao.DateCountPair>,
+    allSessionsInRange: List<com.heartratemonitor.data.entity.TimerSessionEntity>,
+    currentTagFilter: String?,
+    onTagSelected: (String?) -> Unit,
+    onDeleteSession: (Long) -> Unit
+) {
+    // Bar chart — switch data source based on filter range
+    val isMonthly = currentFilter >= 180
+    TimerBarChart(
+        countByDate = if (isMonthly) countByMonth else countByDate,
+        isMonthly = isMonthly,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    )
+
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+    // Table header
+    val availableTags = allSessionsInRange.mapNotNull { it.tag }.distinct()
+    var tagMenuExpanded by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("日期", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f))
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            Text(
+                text = if (currentTagFilter.isNullOrBlank()) "计时事件" else "计时事件($currentTagFilter)",
+                fontSize = 12.sp,
+                fontWeight = if (currentTagFilter != null) FontWeight.Bold else FontWeight.Normal,
+                color = if (currentTagFilter != null) AppColors.HeartRateHigh else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.clickable { tagMenuExpanded = true }
+            )
+            DropdownMenu(
+                expanded = tagMenuExpanded,
+                onDismissRequest = { tagMenuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("全部", fontSize = 14.sp) },
+                    onClick = {
+                        onTagSelected(null)
+                        tagMenuExpanded = false
+                    }
                 )
-                DropdownMenu(
-                    expanded = tagMenuExpanded,
-                    onDismissRequest = { tagMenuExpanded = false }
-                ) {
+                availableTags.forEach { tag ->
                     DropdownMenuItem(
-                        text = { Text("全部", fontSize = 14.sp) },
+                        text = { Text(tag, fontSize = 14.sp) },
                         onClick = {
-                            viewModel.setTimerFilterTag(null)
+                            onTagSelected(tag)
                             tagMenuExpanded = false
                         }
                     )
-                    availableTags.forEach { tag ->
-                        DropdownMenuItem(
-                            text = { Text(tag, fontSize = 14.sp) },
-                            onClick = {
-                                viewModel.setTimerFilterTag(tag)
-                                tagMenuExpanded = false
-                            }
-                        )
-                    }
                 }
             }
-            Text("计时时间", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f), textAlign = TextAlign.End)
         }
+        Text("计时时间", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+    }
 
-        // History list
-        if (sessions.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "暂无计时记录",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                items(sessions) { session ->
-                    val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
-                        .format(Date(session.timestamp))
-                    val mins = session.durationSeconds / 60
-                    val secs = session.durationSeconds % 60
-                    val durationStr = if (mins > 0) "${mins}m${secs}s" else "${secs}s"
+    // History list
+    if (sessions.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "暂无计时记录",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 14.sp
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            items(sessions) { session ->
+                val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
+                    .format(Date(session.timestamp))
+                val mins = session.durationSeconds / 60
+                val secs = session.durationSeconds % 60
+                val durationStr = if (mins > 0) "${mins}m${secs}s" else "${secs}s"
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                            .combinedClickable(
-                                onClick = { },
-                                onLongClick = {
-                                    viewModel.deleteTimerSession(session.timestamp)
-                                }
-                            ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = dateStr,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            if (!session.tag.isNullOrBlank()) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                                ) {
-                                    Text(
-                                        text = session.tag,
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .combinedClickable(
+                            onClick = { },
+                            onLongClick = {
+                                onDeleteSession(session.timestamp)
                             }
-                        }
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = dateStr,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (!session.tag.isNullOrBlank()) {
                             Surface(
-                                shape = MaterialTheme.shapes.small,
-                                color = MaterialTheme.colorScheme.primaryContainer
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
                             ) {
                                 Text(
-                                    text = durationStr,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    text = session.tag,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
                         }
                     }
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = durationStr,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AlarmHistoryContent(alarms: List<com.heartratemonitor.data.entity.AlarmRecordEntity>) {
+    if (alarms.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "暂无闹钟记录",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 14.sp
+            )
+        }
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = "日期",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+    ) {
+        items(alarms) { alarm ->
+            val createdStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
+                .format(Date(alarm.createdAt))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = createdStr,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1.4f)
+                )
+                Box(modifier = Modifier.weight(1.6f), contentAlignment = Alignment.CenterStart) {
+                    Text(
+                        text = alarm.label,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    AlarmStatusChip(status = alarm.status)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlarmStatusChip(status: String) {
+    val (text, color, onColor) = when (status) {
+        com.heartratemonitor.data.entity.AlarmRecordStatus.FIRED ->
+            Triple("已响铃", Color(0xFFE8F5E9), Color(0xFF2E7D32))
+        com.heartratemonitor.data.entity.AlarmRecordStatus.CANCELED ->
+            Triple("已取消", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+        com.heartratemonitor.data.entity.AlarmRecordStatus.SCHEDULED ->
+            Triple("待响铃", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+        else -> Triple(status, MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = color
+    ) {
+        Text(
+            text = text,
+            fontSize = 12.sp,
+            color = onColor,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
     }
 }
 
