@@ -101,11 +101,11 @@ export default {
       }
     }
 
-    // DELETE: remove records by timestamps
+    // DELETE: remove records by timestamps (timer_sessions) or created_at (alarm_records)
     if (request.method === "DELETE") {
       try {
         const body = await request.json();
-        const { timestamps = [] } = body;
+        const { timestamps = [], alarmCreatedAts = [] } = body;
 
         let deletedCount = 0;
 
@@ -115,7 +115,16 @@ export default {
           );
           const batch = timestamps.map((ts) => stmt.bind(ts));
           await env.DB.batch(batch);
-          deletedCount = timestamps.length;
+          deletedCount += timestamps.length;
+        }
+
+        if (alarmCreatedAts.length > 0) {
+          const stmt = env.DB.prepare(
+            `DELETE FROM alarm_records WHERE created_at = ?`
+          );
+          const batch = alarmCreatedAts.map((ca) => stmt.bind(ca));
+          await env.DB.batch(batch);
+          deletedCount += alarmCreatedAts.length;
         }
 
         return new Response(

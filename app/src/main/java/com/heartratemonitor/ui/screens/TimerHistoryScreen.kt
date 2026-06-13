@@ -100,7 +100,10 @@ fun TimerHistoryScreen(viewModel: HeartRateViewModel) {
                 onTagSelected = viewModel::setTimerFilterTag,
                 onDeleteSession = viewModel::deleteTimerSession
             )
-            HeartRateViewModel.HistoryTab.ALARM -> AlarmHistoryContent(alarms = alarms)
+            HeartRateViewModel.HistoryTab.ALARM -> AlarmHistoryContent(
+                alarms = alarms,
+                onDeleteAlarm = viewModel::deleteAlarmRecord
+            )
         }
     }
 }
@@ -262,7 +265,10 @@ private fun TimerHistoryContent(
 }
 
 @Composable
-private fun AlarmHistoryContent(alarms: List<com.heartratemonitor.data.entity.AlarmRecordEntity>) {
+private fun AlarmHistoryContent(
+    alarms: List<com.heartratemonitor.data.entity.AlarmRecordEntity>,
+    onDeleteAlarm: (Long) -> Unit
+) {
     if (alarms.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -301,7 +307,11 @@ private fun AlarmHistoryContent(alarms: List<com.heartratemonitor.data.entity.Al
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 8.dp)
+                    .combinedClickable(
+                        onClick = { },
+                        onLongClick = { onDeleteAlarm(alarm.createdAt) }
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(

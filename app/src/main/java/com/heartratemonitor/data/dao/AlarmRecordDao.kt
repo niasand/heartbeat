@@ -22,6 +22,9 @@ interface AlarmRecordDao {
     @Query("UPDATE alarm_records SET status = :status, completed_at = :completedAt WHERE status = 'scheduled'")
     suspend fun updateScheduledStatus(status: String, completedAt: Long?)
 
+    @Query("DELETE FROM alarm_records WHERE created_at = :createdAt")
+    suspend fun deleteByCreatedAt(createdAt: Long)
+
     @Query("SELECT * FROM alarm_records WHERE created_at >= :after ORDER BY created_at DESC")
     fun getAfter(after: Long): Flow<List<AlarmRecordEntity>>
 

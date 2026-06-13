@@ -38,4 +38,8 @@ class AlarmRecordRepository @Inject constructor(
     suspend fun markCanceled(id: Long) {
         alarmRecordDao.updateStatus(id, AlarmRecordStatus.CANCELED, System.currentTimeMillis())
     }
+
+    suspend fun deleteAlarm(createdAt: Long) {
+        alarmRecordDao.deleteByCreatedAt(createdAt)
+    }
 }

@@ -95,9 +95,12 @@ data class RestoreResult(
 
 /**
  * Delete request body for removing records from cloud
+ * timestamps: timer_sessions rows keyed by timestamp
+ * alarmCreatedAts: alarm_records rows keyed by created_at
  */
 data class DeleteRequest(
-    val timestamps: List<Long>
+    val timestamps: List<Long> = emptyList(),
+    val alarmCreatedAts: List<Long> = emptyList()
 )
 
 data class DeleteResponse(

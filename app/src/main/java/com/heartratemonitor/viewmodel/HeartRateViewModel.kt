@@ -44,6 +44,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 /**
  * 心率数据ViewModel
  */
+// 倒计时标签预设列表（用户无最近使用记录时回退）
+private val DEFAULT_TIMER_TAGS = listOf("平板支撑", "煮鸡蛋", "跳绳", "烧水", "冥想", "拉伸")
+
 @HiltViewModel
 class HeartRateViewModel @Inject constructor(
     private val heartRateRepository: HeartRateRepository,
@@ -58,6 +61,11 @@ class HeartRateViewModel @Inject constructor(
 
     private val _currentHeartRate = MutableStateFlow<Int?>(null)
     val currentHeartRate: StateFlow<Int?> = _currentHeartRate
+
+    // 最近 N 个实时心率样本，用于主屏迷你折线图（有界内存队列，不落库）
+    private val recentHeartRateWindowSize = 30
+    private val _recentHeartRates = MutableStateFlow<List<Int>>(emptyList())
+    val recentHeartRates: StateFlow<List<Int>> = _recentHeartRates
 
     // 严格递增的数据版本号，每次保存心率时 +1，用于强制 UI 刷新
     private val _dataVersion = MutableStateFlow(0)
@@ -126,6 +134,13 @@ class HeartRateViewModel @Inject constructor(
         viewModelScope,
         SharingStarted.Eagerly,
         null
+    )
+
+    // 最近使用的倒计时标签，空时回退到预设列表
+    val recentTimerTags: StateFlow<List<String>> = preferencesManager.recentTimerTagsFlow.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        DEFAULT_TIMER_TAGS
     )
 
     val timerSoundUri: StateFlow<String?> = preferencesManager.timerSoundUriFlow.stateIn(
@@ -409,6 +424,9 @@ class HeartRateViewModel @Inject constructor(
         _currentHeartRate.value = heartRate
         _dataVersion.value++
 
+        // 维护最近样本滑动窗口（保留最近 windowSize 个）
+        _recentHeartRates.value = (_recentHeartRates.value + heartRate).takeLast(recentHeartRateWindowSize)
+
         // 保存到数据库
         viewModelScope.launch {
             heartRateRepository.saveHeartRate(heartRate)
@@ -491,6 +509,17 @@ class HeartRateViewModel @Inject constructor(
     }
 
     /**
+     * Delete an alarm record by created_at, both local and cloud.
+     * Local deletion first for instant UI feedback.
+     */
+    fun deleteAlarmRecord(createdAt: Long) {
+        viewModelScope.launch {
+            alarmRecordRepository.deleteAlarm(createdAt)
+            syncRepository.deleteFromCloud(alarmCreatedAts = listOf(createdAt))
+        }
+    }
+
+    /**
      * Save timer session when countdown finishes
      */
     fun saveTimerSession(durationSeconds: Int, tag: String? = null) {
@@ -505,6 +534,18 @@ class HeartRateViewModel @Inject constructor(
     fun saveThemeColor(value: String) {
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             preferencesManager.saveThemeColor(value)
+        }
+    }
+
+    /**
+     * 记录一个最近使用的倒计时标签：去重、置顶、限 5 个，并持久化。
+     */
+    fun addRecentTimerTag(tag: String) {
+        val trimmed = tag.trim()
+        if (trimmed.isEmpty()) return
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val updated = (listOf(trimmed) + recentTimerTags.value.filter { it != trimmed }).take(5)
+            preferencesManager.saveRecentTimerTags(updated)
         }
     }
 

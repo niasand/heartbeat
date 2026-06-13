@@ -41,3 +41,24 @@
   - Gotcha: LocalBackupManager 旧备份无 alarm 文件，hasLocalBackup/readLocalBackup 必须容错(不强制 alarm 文件存在)，否则老用户恢复崩溃
   - Gotcha: SyncApiClient 用 Gson 反序列化，DTO 字段加默认值即自动兼容旧 Worker(忽略 alarmRecords 不崩)，无需改 client 代码——这是"用户稍后自改 Worker"能成立的桥梁
   - Database 不动: 不加列/不加表/不加 migration，version 仍为 4
+
+---
+
+## 2026-06-13 - 主屏（实时 tab）UI 优化
+- What: 第一 tab 的 5 项效率/简洁/实用优化
+  1. 心率卡片加迷你折线图（MiniHeartRateChart，纯 Canvas）
+  2. 倒计时区从 6 元素堆叠压成 2 行（时间+开始同行 / 标签+次级入口同行）
+  3. 分秒双输入框合并为单个分钟数输入
+  4. 智能计时按钮从实心 Button 降级为 OutlinedButton（让"开始"成唯一主 CTA）
+  5. 标签下拉从硬编码改为 DataStore 持久化的最近使用（去重置顶限 5 个）
+- Files changed:
+  - app/src/main/java/com/heartratemonitor/ui/components/MiniHeartRateChart.kt (新增)
+  - app/src/main/java/com/heartratemonitor/ui/screens/HeartRateScreen.kt
+  - app/src/main/java/com/heartratemonitor/viewmodel/HeartRateViewModel.kt
+  - app/src/main/java/com/heartratemonitor/data/pref/PreferencesManager.kt
+- **Learnings:**
+  - Pattern: 跨函数数据流 collect 必须放在实际消费 Composable 的作用域里（recentTimerTags 在 RealTimeHeartRateScreen 内 collect，不是 HeartRateScreen），否则 Unresolved reference。
+  - Pattern: 移除"秒数输入框"后，残留的 inputSeconds 默认值 "40" 会污染 inputComputedTotal（minutes*60 + 40），必须在分钟输入 onValueChange 里主动 onInputSecondsChange("0") 清零。
+  - Pattern: PreferencesManager 现有 save* 方法用 GlobalScope.launch(IO)（非最佳但统一），新增 addRecentTimerTag 跟随该风格保持一致。
+  - Gotcha: 标签持久化用逗号分隔单 String 存储最简单可靠，避免引 arrayPreferencesKey 复杂度（YAGNI）。
+  - Gotcha: TimerState 是跨函数数据契约（含 inputMinutes/inputSeconds + 语音回调 onInputSecondsChange），改 UI 不能删字段，只改渲染层。

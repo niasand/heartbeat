@@ -205,13 +205,17 @@ class SyncRepository @Inject constructor(
     }
 
     /**
-     * Delete timer sessions by timestamps from cloud (D1)
+     * Delete records from cloud (D1).
+     * timestamps target timer_sessions; alarmCreatedAts target alarm_records.
      */
-    suspend fun deleteFromCloud(timestamps: List<Long>): DeleteResponse {
-        if (timestamps.isEmpty()) {
+    suspend fun deleteFromCloud(
+        timestamps: List<Long> = emptyList(),
+        alarmCreatedAts: List<Long> = emptyList()
+    ): DeleteResponse {
+        if (timestamps.isEmpty() && alarmCreatedAts.isEmpty()) {
             return DeleteResponse(success = true, deletedCount = 0)
         }
-        return syncApiClient.deleteData(DeleteRequest(timestamps))
+        return syncApiClient.deleteData(DeleteRequest(timestamps, alarmCreatedAts))
     }
 
     companion object {
