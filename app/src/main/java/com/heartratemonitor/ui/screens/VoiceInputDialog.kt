@@ -26,6 +26,13 @@ data class VoiceInputResult(
     val seconds: Int
 )
 
+data class VoiceAlarmResult(
+    val eventName: String,
+    val hour: Int,
+    val minute: Int,
+    val dateOffsetDays: Int
+)
+
 /** Dialog phases. */
 private enum class DialogPhase {
     INPUT,          // User is typing
@@ -145,7 +152,7 @@ fun VoiceInputDialog(
         confirmButton = {
             TextButton(
                 onClick = { parseAndStart() },
-                enabled = inputText.isNotBlank() && phase == DialogPhase.INPUT
+                enabled = inputText.isNotBlank() && phase != DialogPhase.PARSING
             ) {
                 Icon(
                     imageVector = Icons.Default.Send,
@@ -154,6 +161,131 @@ fun VoiceInputDialog(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(if (phase == DialogPhase.PARSE_FAILED) "重试" else "开始")
+            }
+        },
+        dismissButton = {
+            if (phase != DialogPhase.PARSING) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.voice_cancel))
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun SmartAlarmInputDialog(
+    apiKey: String,
+    onDismiss: () -> Unit,
+    onResult: (VoiceAlarmResult?) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    var phase by remember { mutableStateOf(DialogPhase.INPUT) }
+    var inputText by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    fun parseAndSchedule() {
+        val text = inputText.trim()
+        if (text.isBlank()) return
+
+        phase = DialogPhase.PARSING
+        errorMessage = null
+        scope.launch {
+            val result = VoiceCommandParser.parseAlarm(apiKey, text)
+            if (result != null) {
+                onResult(result)
+            } else {
+                phase = DialogPhase.PARSE_FAILED
+                errorMessage = if (apiKey.isBlank()) {
+                    "请写清楚闹钟时间，或先在设置中配置 AI 语音解析的 API Key"
+                } else {
+                    "无法从输入中提取闹钟时间，请重试"
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        focusRequester.requestFocus()
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (phase != DialogPhase.PARSING) onDismiss() },
+        title = {
+            Text(
+                text = "智能闹钟",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "输入闹钟时间和用途，例如：\n帮我订一个3:30的闹钟 我要去赶飞机",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = {
+                        inputText = it
+                        errorMessage = null
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    placeholder = { Text("3:30 赶飞机") },
+                    singleLine = true,
+                    enabled = phase != DialogPhase.PARSING,
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                if (phase == DialogPhase.PARSING) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "正在解析…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { parseAndSchedule() },
+                enabled = inputText.isNotBlank() && phase != DialogPhase.PARSING
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(if (phase == DialogPhase.PARSE_FAILED) "重试" else "设置")
             }
         },
         dismissButton = {
