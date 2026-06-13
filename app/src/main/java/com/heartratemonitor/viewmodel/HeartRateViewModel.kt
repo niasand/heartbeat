@@ -543,7 +543,7 @@ class HeartRateViewModel @Inject constructor(
     fun addRecentTimerTag(tag: String) {
         val trimmed = tag.trim()
         if (trimmed.isEmpty()) return
-        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val updated = (listOf(trimmed) + recentTimerTags.value.filter { it != trimmed }).take(5)
             preferencesManager.saveRecentTimerTags(updated)
         }
